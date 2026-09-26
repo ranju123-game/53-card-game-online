@@ -2081,6 +2081,10 @@ function renderPlayers() {
 
         if (!player || !playerBox) continue;
 
+        // Record which real player occupies this visual seat. Meld rendering
+        // uses this same mapping so each player's meld stays in their own box.
+        playerBox.dataset.playerIndex = String(playerIndex);
+
         // Keep the local player in the bottom seat and label others by name.
         const heading = playerBox.querySelector("h2");
         if (heading) {
@@ -4903,14 +4907,14 @@ function renderMelds() {
             players[i];
 
         /*
-           Place this player's meld in their seat relative to the local
-           player. Player data remains indexed by the original playerIndex;
-           only the visual seat changes for online clients.
+           Find the visual seat that renderPlayers assigned to this actual
+           player. Do not calculate the seat separately here: using the same
+           data-player-index mapping prevents melds from appearing in another
+           player's section in online games.
         */
-        const seatOffset =
-            (i - getLocalPlayerIndex() + PLAYER_COUNT) % PLAYER_COUNT;
-        const playerBox =
-            $(`player${seatOffset + 1}`);
+        const playerBox = document.querySelector(
+            `.player[data-player-index="${i}"]`
+        );
 
         if (!playerBox) {
             continue;
