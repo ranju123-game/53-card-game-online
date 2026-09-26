@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+  >
+
+  <title>53 Card Game</title>
+
+  <link rel="stylesheet" href="style.css">
+
+  <style>
+    /* =========================================================
+       OPENING MENU
+       The menu is shown first. The game is hidden until
+       NEW GAME or RESUME is pressed.
+    ========================================================= */
+
+    #mainMenu {
+      position: fixed;
+      inset: 0;
+      z-index: 100000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+      box-sizing: border-box;
+      background:
+        radial-gradient(circle at top, #2f3f5f 0%, #182238 45%, #0b1020 100%);
+    }
+
+    .menu-card {
+      width: min(92vw, 430px);
+      box-sizing: border-box;
+      padding: 42px 28px 34px;
+      text-align: center;
+      border-radius: 24px;
+      background: rgba(255, 255, 255, 0.97);
+      box-shadow: 0 25px 70px rgba(0, 0, 0, 0.45);
+    }
+
+    .menu-card h1 {
+      margin: 0;
+      font-size: clamp(30px, 8vw, 46px);
+      line-height: 1.1;
+      color: #111827;
+    }
+
+    .menu-card p {
+      margin: 12px 0 30px;
+      color: #5b6472;
+      font-size: 15px;
+    }
+
+    .menu-button {
+      width: 100%;
+      min-height: 58px;
+      margin-top: 12px;
+      border: 0;
+      border-radius: 14px;
+      font-size: 18px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform 0.15s ease, opacity 0.15s ease;
+    }
+
+    .menu-button:hover:not(:disabled) {
+      transform: translateY(-2px);
+    }
+
+    .menu-button:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    .menu-new-game {
+      background: #222;
+      color: #fff;
+    }
+
+    .menu-resume {
+      background: #e8ebf0;
+      color: #222;
+    }
+
+    .menu-button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    #resumeStatus {
+      min-height: 20px;
+      margin: 16px 0 0;
+      font-size: 13px;
+      color: #687386;
+    }
+
+    /* The actual game starts hidden. */
+    #gameScreen {
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- =========================================================
+       OPENING MENU
+  ========================================================== -->
+
+  <div id="mainMenu">
+
+    <div class="menu-card">
+
+      <h1>🃏 53 Card Game</h1>
+
+      <p>
+        5 Players • 53 Cards • 8 Cards Each
+      </p>
+
+      <button
+        id="menuNewGameBtn"
+        class="menu-button menu-new-game"
+        type="button"
+      >
+        NEW GAME
+      </button>
+
+      <button
+        id="menuResumeBtn"
+        class="menu-button menu-resume"
+        type="button"
+        disabled
+      >
+        RESUME
+      </button>
+
+      <div id="resumeStatus">
+        No saved game available.
+      </div>
+
+    </div>
+
+  </div>
+
+
+  <!-- =========================================================
+       ACTUAL GAME
+  ========================================================== -->
+
+  <div class="app" id="gameScreen">
+
+    <!-- TOP BAR -->
+    <header class="topbar">
+
+      <div>
+        <h1>🃏 53 Card Game</h1>
+        <p>5 Players • 53 Cards • 8 Cards Each</p>
+      </div>
+
+      <button id="newGameBtn" class="primary">
+        New Game
+      </button>
+
+    </header>
+
+
+    <!-- INFORMATION -->
+    <section class="info-panel">
+
+      <div>
+        <span>Indicator</span>
+        <strong id="indicator">-</strong>
+      </div>
+
+      <div>
+        <span>Universal Joker</span>
+        <strong id="universalJoker">-</strong>
+      </div>
+
+      <div>
+        <span>Draw Pile</span>
+        <strong id="drawCount">0</strong>
+      </div>
+
+      <div>
+        <span>Discard Cards</span>
+        <strong id="discardCount">0</strong>
+      </div>
+
+    </section>
+
+
+    <main>
+
+      <!-- GAME TABLE -->
+      <section class="table">
+
+
+        <!-- PLAYER 2 -->
+        <div class="player ai-player" id="player2">
+
+          <h2>
+            Player 2
+            <span class="status"></span>
+          </h2>
+
+          <div class="melds"></div>
+
+          <div
+            class="back-cards"
+            id="p2Cards"
+          ></div>
+
+        </div>
+
+
+        <!-- PLAYER 3 -->
+        <div class="player ai-player" id="player3">
+
+          <h2>
+            Player 3
+            <span class="status"></span>
+          </h2>
+
+          <div class="melds"></div>
+
+          <div
+            class="back-cards"
+            id="p3Cards"
+          ></div>
+
+        </div>
+
+
+        <!-- CENTER TABLE -->
+        <div class="center-table">
+
+
+          <!-- DRAW + INDICATOR -->
+          <div class="draw-column">
+
+            <!-- INDICATOR -->
+            <div
+              id="tableIndicator"
+              class="table-indicator"
+            ></div>
+
+
+            <!-- DRAW -->
+            <div class="pile">
+
+              <div class="pile-title">
+                DRAW
+              </div>
+
+              <button
+                id="drawBtn"
+                class="deck-card"
+                title="Draw a card"
+              >
+                🂠
+              </button>
+
+            </div>
+
+          </div>
+
+
+          <!-- DISCARD -->
+          <div class="discard-column">
+
+            <div class="pile-title">
+              DISCARD
+            </div>
+
+            <!-- ALL DISCARD CARDS ARE SHOWN HERE -->
+            <div
+              id="discardTop"
+              class="discard-cards"
+            ></div>
+
+
+            <!--
+              TAKE DISCARD BUTTON
+              Kept in the HTML so the game function
+              still works, but hidden visually.
+            -->
+            <button
+              id="takeDiscardBtn"
+              class="card empty discard-take-button"
+              title="Take top discard"
+              style="display: none;"
+            >
+              -
+            </button>
+
+          </div>
+
+
+          <!-- MESSAGE -->
+          <div
+            id="message"
+            class="message"
+          >
+            Your turn
+          </div>
+
+
+        </div>
+
+
+        <!-- PLAYER 4 -->
+        <div class="player ai-player" id="player4">
+
+          <h2>
+            Player 4
+            <span class="status"></span>
+          </h2>
+
+          <div class="melds"></div>
+
+          <div
+            class="back-cards"
+            id="p4Cards"
+          ></div>
+
+        </div>
+
+
+        <!-- PLAYER 5 -->
+        <div class="player ai-player" id="player5">
+
+          <h2>
+            Player 5
+            <span class="status"></span>
+          </h2>
+
+          <div class="melds"></div>
+
+          <div
+            class="back-cards"
+            id="p5Cards"
+          ></div>
+
+        </div>
+
+
+        <!-- PLAYER 1 -->
+        <section
+          class="your-area player"
+          id="player1"
+        >
+
+          <div class="player-heading">
+
+            <h2>
+              You
+              <span class="status"></span>
+            </h2>
+
+            <div class="actions">
+
+              <button id="sortBtn">
+                Sort
+              </button>
+
+              <button id="makeMeldBtn">
+                Make Meld
+              </button>
+
+              <button
+                id="discardBtn"
+                class="danger"
+              >
+                Discard Selected
+              </button>
+
+            </div>
+
+          </div>
+
+
+          <div class="melds"></div>
+
+          <div
+            id="hand"
+            class="hand"
+          ></div>
+
+        </section>
+
+
+      </section>
+
+    </main>
+
+  </div>
+
+
+  <script src="script.js"></script>
+
+</body>
+
+</html>

@@ -1,0 +1,14 @@
+{
+  "name": "53-card-game-online",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Online 5-player server for the 53 Card Game",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.117.1",
+    "ws": "^8.18.3"
+  }
+}

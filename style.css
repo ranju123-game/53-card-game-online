@@ -1,0 +1,1046 @@
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    min-height: 100%;
+    font-family: Arial, sans-serif;
+    background: #0b5d3b;
+    color: white;
+}
+
+body {
+    overflow-x: hidden;
+}
+
+.app {
+    width: 100%;
+    min-height: 100vh;
+    padding: 10px;
+}
+
+/* =====================================================
+   TOP BAR
+===================================================== */
+
+.topbar {
+    width: 100%;
+    max-width: 1100px;
+    margin: 0 auto 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.topbar h1 {
+    margin: 0;
+    font-size: 24px;
+}
+
+.topbar p {
+    margin: 3px 0 0;
+    font-size: 13px;
+    opacity: 0.85;
+}
+
+.topbar button {
+    border: none;
+    border-radius: 7px;
+    padding: 10px 18px;
+    background: #f5f5f5;
+    color: #222;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+/* =====================================================
+   INFORMATION
+===================================================== */
+
+.info-panel {
+    width: 100%;
+    max-width: 900px;
+    margin: 0 auto 10px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.info-panel > div {
+    background: rgba(0, 0, 0, 0.35);
+    border-radius: 10px;
+    padding: 7px 14px;
+    text-align: center;
+    min-width: 110px;
+}
+
+.info-panel span {
+    display: block;
+    font-size: 11px;
+    opacity: 0.8;
+    margin-bottom: 3px;
+}
+
+.info-panel strong {
+    display: block;
+    font-weight: bold;
+}
+
+/* =====================================================
+   GAME AREA
+===================================================== */
+
+main {
+    width: 100%;
+}
+
+.table {
+    position: relative;
+    width: min(96vw, 1050px);
+    height: min(82vh, 700px);
+    min-height: 500px;
+    margin: 0 auto;
+    background:
+        radial-gradient(
+            ellipse at center,
+            #147b4e 0%,
+            #09633d 55%,
+            #064b30 100%
+        );
+    border: 10px solid #5b351d;
+    border-radius: 50%;
+    box-shadow:
+        0 10px 30px rgba(0, 0, 0, 0.45),
+        inset 0 0 0 3px rgba(255, 255, 255, 0.08);
+    overflow: visible;
+}
+
+/* =====================================================
+   PLAYERS
+===================================================== */
+
+.player {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.25);
+    border: 2px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    padding: 7px;
+    min-height: 85px;
+    transform: translate(-50%, -50%);
+    z-index: 10;
+}
+
+.player h2 {
+    margin: 0 0 4px;
+    font-size: 18px;
+}
+
+.player-name {
+    font-size: 14px;
+    font-weight: bold;
+    margin-bottom: 4px;
+}
+
+.status {
+    min-height: 16px;
+    font-size: 11px;
+    color: #ffe66d;
+    font-weight: bold;
+}
+
+/* =====================================================
+   PLAYER POSITIONS
+===================================================== */
+
+#player1 {
+    left: 50%;
+    top: 88%;
+    width: 390px;
+}
+
+#player2 {
+    left: 87%;
+    top: 63%;
+    width: 190px;
+}
+
+#player3 {
+    left: 72.8%;
+    top: 18%;
+    width: 190px;
+}
+
+#player4 {
+    left: 27.2%;
+    top: 18%;
+    width: 190px;
+}
+
+#player5 {
+    left: 13%;
+    top: 63%;
+    width: 190px;
+}
+
+/* =====================================================
+   PLAYER CARDS
+===================================================== */
+
+.player-cards,
+.back-cards {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 2px;
+    max-width: 100%;
+}
+
+.back-cards {
+    flex-wrap: nowrap;
+    gap: 0;
+}
+
+.back-cards .back-card {
+    margin: 1px 0 1px -18px;
+    position: relative;
+}
+
+.back-cards .back-card:first-child {
+    margin-left: 1px;
+}
+
+/* =====================================================
+   NORMAL CARD
+===================================================== */
+
+.card {
+    width: 48px;
+    height: 68px;
+    border: 1px solid #222;
+    border-radius: 6px;
+    background: white;
+    color: black;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow:
+        0 2px 4px rgba(0, 0, 0, 0.3);
+    transition:
+        transform 0.12s ease,
+        box-shadow 0.12s ease;
+}
+
+.card:hover {
+    transform: translateY(-3px);
+}
+
+.card.red {
+    color: #d00000;
+}
+
+.card.black {
+    color: #111;
+}
+
+.card.joker {
+    color: #7b1fa2;
+    font-size: 23px;
+}
+
+.card.selected {
+    transform: translateY(-8px);
+    box-shadow:
+        0 0 0 3px #ffe66d,
+        0 5px 10px rgba(0, 0, 0, 0.4);
+}
+
+/* =====================================================
+   BACK CARD
+===================================================== */
+
+.back-card {
+    width: 34px;
+    height: 48px;
+    margin: 1px;
+    border-radius: 5px;
+    border: 2px solid white;
+    background:
+        repeating-linear-gradient(
+            45deg,
+            #173c9e,
+            #173c9e 4px,
+            #2855c4 4px,
+            #2855c4 8px
+        );
+    box-shadow:
+        0 2px 4px rgba(0, 0, 0, 0.35);
+}
+
+/* =====================================================
+   CENTER TABLE
+===================================================== */
+
+.center-table {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 25px;
+    z-index: 50;
+}
+
+/* =====================================================
+   DRAW COLUMN
+===================================================== */
+
+.draw-column {
+    display: grid;
+    grid-template-columns: auto auto;
+    grid-template-rows: auto;
+    align-items: center;
+    justify-content: center;
+    column-gap: 12px;
+    position: relative;
+    transform: translate(90px, -110px);
+}
+
+.table-indicator {
+    display: flex;
+    grid-column: 1;
+    grid-row: 1;
+    min-height: 68px;
+    margin-bottom: 0;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+.pile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    grid-column: 2;
+    grid-row: 1;
+}
+
+.pile-title {
+    font-size: 12px;
+    font-weight: bold;
+    margin-bottom: 5px;
+    text-align: center;
+}
+
+/* =====================================================
+   DRAW DECK
+===================================================== */
+
+.deck-card {
+    width: 55px;
+    height: 75px;
+    border-radius: 7px;
+    border: 2px solid white;
+    background:
+        repeating-linear-gradient(
+            45deg,
+            #173c9e,
+            #173c9e 5px,
+            #2855c4 5px,
+            #2855c4 10px
+        );
+    color: transparent;
+    font-size: 0;
+    cursor: pointer;
+    box-shadow:
+        0 3px 6px rgba(0, 0, 0, 0.4);
+}
+
+.deck-card:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+/* =====================================================
+   DISCARD
+===================================================== */
+
+.discard-column {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 170px;
+}
+
+.discard-column .pile-title {
+    margin-bottom: 5px;
+}
+
+.discard-cards {
+    position: relative;
+    display: block;
+    width: 230px;
+    height: 105px;
+    max-height: none;
+    overflow: visible;
+    margin: 0 auto;
+}
+
+.discard-cards .card.small {
+    position: absolute;
+    width: 38px;
+    height: 53px;
+    font-size: 13px;
+    margin: 0;
+    left: 50%;
+    top: 38px;
+    transform-origin: 50% 90%;
+    cursor: default;
+    transition: none;
+    z-index: 1;
+}
+
+.discard-cards .card.small:nth-child(1) {
+    margin-left: -19px;
+    transform: translate(-96px, 27px) rotate(-28deg);
+    z-index: 1;
+}
+
+.discard-cards .card.small:nth-child(2) {
+    margin-left: -19px;
+    transform: translate(-80px, 17px) rotate(-24deg);
+    z-index: 2;
+}
+
+.discard-cards .card.small:nth-child(3) {
+    margin-left: -19px;
+    transform: translate(-64px, 9px) rotate(-20deg);
+    z-index: 3;
+}
+
+.discard-cards .card.small:nth-child(4) {
+    margin-left: -19px;
+    transform: translate(-48px, 3px) rotate(-16deg);
+    z-index: 4;
+}
+
+.discard-cards .card.small:nth-child(5) {
+    margin-left: -19px;
+    transform: translate(-32px, -1px) rotate(-12deg);
+    z-index: 5;
+}
+
+.discard-cards .card.small:nth-child(6) {
+    margin-left: -19px;
+    transform: translate(-16px, -4px) rotate(-8deg);
+    z-index: 6;
+}
+
+.discard-cards .card.small:nth-child(7) {
+    margin-left: -19px;
+    transform: translate(0, -5px) rotate(0deg);
+    z-index: 7;
+}
+
+.discard-cards .card.small:nth-child(8) {
+    margin-left: -19px;
+    transform: translate(16px, -4px) rotate(8deg);
+    z-index: 8;
+}
+
+.discard-cards .card.small:nth-child(9) {
+    margin-left: -19px;
+    transform: translate(32px, -1px) rotate(12deg);
+    z-index: 9;
+}
+
+.discard-cards .card.small:nth-child(10) {
+    margin-left: -19px;
+    transform: translate(48px, 3px) rotate(16deg);
+    z-index: 10;
+}
+
+.discard-cards .card.small:nth-child(11) {
+    margin-left: -19px;
+    transform: translate(64px, 9px) rotate(20deg);
+    z-index: 11;
+}
+
+.discard-cards .card.small:nth-child(12) {
+    margin-left: -19px;
+    transform: translate(80px, 17px) rotate(24deg);
+    z-index: 12;
+}
+
+.discard-cards .card.small:nth-child(13) {
+    margin-left: -19px;
+    transform: translate(96px, 27px) rotate(28deg);
+    z-index: 13;
+}
+
+.discard-cards .top-discard {
+    outline: 3px solid #ffe66d;
+    outline-offset: 1px;
+}
+
+/* =====================================================
+   TAKE DISCARD
+===================================================== */
+
+.discard-take-button {
+    width: 38px;
+    height: 53px;
+    margin-top: 5px;
+    font-size: 13px;
+}
+
+/* =====================================================
+   MESSAGE
+===================================================== */
+
+.center-table .message {
+    position: absolute;
+    left: 50%;
+    top: -185px;
+    transform: translateX(-50%);
+    width: 220px;
+    min-height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 5px 8px;
+    background: rgba(0, 0, 0, 0.65);
+    border-radius: 8px;
+    font-size: 13px;
+    line-height: 1.35;
+    text-align: center;
+    z-index: 500;
+    pointer-events: none;
+}
+
+/* =====================================================
+   HAND
+===================================================== */
+
+.hand {
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    flex-wrap: nowrap;
+    gap: 4px;
+    width: 100%;
+    margin-top: 5px;
+}
+
+/* =====================================================
+   MELDS
+===================================================== */
+
+.melds {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    margin-top: 4px;
+    max-width: 100%;
+}
+
+.meld-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    flex-wrap: wrap;
+}
+
+.meld-row .card.small {
+    width: 35px;
+    height: 49px;
+    font-size: 12px;
+    cursor: default;
+}
+
+.meld-row .card.small:hover {
+    transform: none;
+}
+
+/* =====================================================
+   PLAYER 1 ACTIONS
+===================================================== */
+
+.player-heading {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.player-heading h2 {
+    margin-bottom: 5px;
+}
+
+.actions {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
+.actions button {
+    border: none;
+    border-radius: 6px;
+    padding: 7px 10px;
+    background: #f5f5f5;
+    color: #222;
+    font-size: 13px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.actions button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.actions .danger {
+    background: #f5f5f5;
+}
+
+/* =====================================================
+   CONTROLS
+===================================================== */
+
+.controls {
+    width: 100%;
+    max-width: 900px;
+    margin: 12px auto 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.controls button {
+    border: none;
+    border-radius: 7px;
+    padding: 9px 15px;
+    background: #f5f5f5;
+    color: #222;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow:
+        0 2px 5px rgba(0, 0, 0, 0.25);
+}
+
+.controls button:hover {
+    transform: translateY(-1px);
+}
+
+.controls button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* =====================================================
+   COMPLETE
+===================================================== */
+
+#completeBtn {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    padding: 10px 24px;
+    min-width: 120px;
+    border: 2px solid white;
+    border-radius: 8px;
+    background: #e6a800;
+    color: white;
+    font-size: 15px;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow:
+        0 3px 8px rgba(0, 0, 0, 0.4);
+}
+
+#completeBtn:hover {
+    transform:
+        translateX(-50%)
+        translateY(-2px);
+}
+
+#completeBtn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: translateX(-50%);
+}
+
+/* =====================================================
+   BUTTONS
+===================================================== */
+
+button {
+    font-family: inherit;
+}
+
+button:active {
+    transform: scale(0.97);
+}
+
+/* =====================================================
+   MOBILE
+===================================================== */
+
+@media (max-width: 700px) {
+
+    .app {
+        padding: 5px;
+    }
+
+    .topbar {
+        margin-bottom: 5px;
+    }
+
+    .topbar h1 {
+        font-size: 18px;
+    }
+
+    .topbar p {
+        font-size: 10px;
+    }
+
+    .topbar button {
+        padding: 7px 12px;
+        font-size: 11px;
+    }
+
+    .info-panel {
+        gap: 5px;
+        margin-bottom: 5px;
+    }
+
+    .info-panel > div {
+        min-width: 80px;
+        padding: 5px 8px;
+    }
+
+    .info-panel span {
+        font-size: 9px;
+    }
+
+    .table {
+        width: 98vw;
+        height: 78vh;
+        min-height: 450px;
+        border-width: 7px;
+    }
+
+    #player1 {
+        left: 50%;
+        top: 88%;
+        width: 250px;
+    }
+
+    #player2 {
+        left: 88%;
+        top: 63%;
+        width: 125px;
+    }
+
+    #player3 {
+        left: 72%;
+        top: 17%;
+        width: 125px;
+    }
+
+    #player4 {
+        left: 28%;
+        top: 17%;
+        width: 125px;
+    }
+
+    #player5 {
+        left: 12%;
+        top: 63%;
+        width: 125px;
+    }
+
+    .player {
+        padding: 4px;
+        min-height: 65px;
+    }
+
+    .player h2 {
+        font-size: 13px;
+    }
+
+    .player-name {
+        font-size: 11px;
+    }
+
+    .status {
+        font-size: 9px;
+    }
+
+    .back-card {
+        width: 22px;
+        height: 32px;
+        border-width: 1px;
+    }
+
+    .back-cards .back-card {
+        margin-left: -11px;
+    }
+
+    .back-cards .back-card:first-child {
+        margin-left: 1px;
+    }
+
+    .discard-cards {
+        width: 150px;
+        height: 78px;
+    }
+
+    .discard-cards .card.small {
+        width: 28px;
+        height: 40px;
+        font-size: 10px;
+        top: 29px;
+    }
+
+    .discard-cards .card.small:nth-child(1) {
+        margin-left: -14px;
+        transform: translate(-63px, 20px) rotate(-28deg);
+    }
+
+    .discard-cards .card.small:nth-child(2) {
+        margin-left: -14px;
+        transform: translate(-52px, 13px) rotate(-24deg);
+    }
+
+    .discard-cards .card.small:nth-child(3) {
+        margin-left: -14px;
+        transform: translate(-41px, 7px) rotate(-20deg);
+    }
+
+    .discard-cards .card.small:nth-child(4) {
+        margin-left: -14px;
+        transform: translate(-30px, 2px) rotate(-16deg);
+    }
+
+    .discard-cards .card.small:nth-child(5) {
+        margin-left: -14px;
+        transform: translate(-20px, -1px) rotate(-12deg);
+    }
+
+    .discard-cards .card.small:nth-child(6) {
+        margin-left: -14px;
+        transform: translate(-10px, -3px) rotate(-8deg);
+    }
+
+    .discard-cards .card.small:nth-child(7) {
+        margin-left: -14px;
+        transform: translate(0, -4px) rotate(0deg);
+    }
+
+    .discard-cards .card.small:nth-child(8) {
+        margin-left: -14px;
+        transform: translate(10px, -3px) rotate(8deg);
+    }
+
+    .discard-cards .card.small:nth-child(9) {
+        margin-left: -14px;
+        transform: translate(20px, -1px) rotate(12deg);
+    }
+
+    .discard-cards .card.small:nth-child(10) {
+        margin-left: -14px;
+        transform: translate(30px, 2px) rotate(16deg);
+    }
+
+    .discard-cards .card.small:nth-child(11) {
+        margin-left: -14px;
+        transform: translate(41px, 7px) rotate(20deg);
+    }
+
+    .discard-cards .card.small:nth-child(12) {
+        margin-left: -14px;
+        transform: translate(52px, 13px) rotate(24deg);
+    }
+
+    .discard-cards .card.small:nth-child(13) {
+        margin-left: -14px;
+        transform: translate(63px, 20px) rotate(28deg);
+    }
+
+    .center-table {
+        gap: 10px;
+    }
+
+    .deck-card {
+        width: 45px;
+        height: 62px;
+        font-size: 0;
+        color: transparent;
+    }
+
+    .table-indicator {
+        min-height: 55px;
+    }
+
+    .table-indicator .card {
+        width: 40px;
+        height: 56px;
+        font-size: 15px;
+    }
+
+    .discard-column {
+        min-width: 115px;
+    }
+
+    .discard-cards {
+        width: 115px;
+        gap: 2px;
+    }
+
+    .discard-cards .card.small {
+        width: 28px;
+        height: 40px;
+        font-size: 10px;
+    }
+
+    .card {
+        width: 38px;
+        height: 54px;
+        font-size: 14px;
+    }
+
+    .meld-row .card.small {
+        width: 27px;
+        height: 38px;
+        font-size: 9px;
+    }
+
+    .center-table .message {
+        top: -105px;
+        width: 280px;
+        min-height: 48px;
+        padding: 7px 10px;
+        font-size: 10px;
+        line-height: 1.3;
+    }
+
+    #completeBtn {
+        top: 7px;
+        padding: 7px 16px;
+        min-width: 95px;
+        font-size: 12px;
+    }
+
+    .actions {
+        gap: 4px;
+    }
+
+    .actions button {
+        padding: 6px 8px;
+        font-size: 10px;
+    }
+
+    .controls {
+        gap: 5px;
+    }
+
+    .controls button {
+        padding: 7px 10px;
+        font-size: 11px;
+    }
+}
+
+/* =====================================================
+   SMALL PHONE
+===================================================== */
+
+@media (max-width: 450px) {
+
+    .table {
+        height: 75vh;
+        min-height: 400px;
+    }
+
+    #player1 {
+        width: 220px;
+    }
+
+    #player2,
+    #player3,
+    #player4,
+    #player5 {
+        width: 105px;
+    }
+
+    .player h2 {
+        font-size: 11px;
+    }
+
+    .player-name {
+        font-size: 10px;
+    }
+
+    .center-table {
+        gap: 6px;
+    }
+
+    .discard-column {
+        min-width: 95px;
+    }
+
+    .discard-cards {
+        width: 95px;
+    }
+
+    .discard-cards .card.small {
+        width: 25px;
+        height: 36px;
+        font-size: 9px;
+    }
+
+    .center-table .message {
+        top: -92px;
+        width: 250px;
+        min-height: 45px;
+        padding: 6px 8px;
+        font-size: 9px;
+        line-height: 1.25;
+    }
+
+    #completeBtn {
+        top: 5px;
+        min-width: 85px;
+        padding: 6px 12px;
+        font-size: 11px;
+    }
+}
