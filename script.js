@@ -3189,9 +3189,9 @@ function makeMeld() {
         true
     );
 
-    players[0].melds.push(
-        newMeld
-    );
+    players[getLocalPlayerIndex()].melds.push(
+    newMeld
+);
 
 
     if (
