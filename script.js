@@ -4912,8 +4912,13 @@ function renderMelds() {
            data-player-index mapping prevents melds from appearing in another
            player's section in online games.
         */
-        const playerBox = document.querySelector(
-            `.player[data-player-index="${i}"]`
+        // Resolve the seat by the same IDs used in renderPlayers().
+        // Do not depend on a CSS class being present on the seat element.
+        const playerBox = Array.from(
+            { length: PLAYER_COUNT },
+            (_, seatOffset) => $(`player${seatOffset + 1}`)
+        ).find(
+            box => box && Number(box.dataset.playerIndex) === i
         );
 
         if (!playerBox) {
