@@ -137,7 +137,9 @@ wss.on('connection', ws => {
       room.clients.push(ws);
       send(ws, { type: 'joined', roomCode: code, playerIndex: index });
       broadcast(room, { type: 'room_status', count: room.clients.length });
-      if (room.clients.length === PLAYER_COUNT) broadcast(room, { type: 'room_full' });
+      if (room.clients.length === PLAYER_COUNT) {
+  send(room.host, { type: 'room_full' });
+}
       if (room.state) broadcastState(room);
       return;
     }
