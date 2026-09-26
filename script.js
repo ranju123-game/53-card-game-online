@@ -2065,70 +2065,54 @@ function toggleCardSelection(
 ========================================================= */
 
 function renderPlayers() {
-    for (
-        let i = 1;
-        i < PLAYER_COUNT;
-        i++
-    ) {
-        const player =
-            players[i];
+    /*
+       The local player always sits in the bottom seat (#player1).
+       In online games, rotate the other players around that seat so
+       card backs, names, melds, and turn indicators all refer to the
+       same actual player. Offline play keeps the original layout.
+    */
+    const localIndex = getLocalPlayerIndex();
 
-        const box =
-            $(`p${i + 1}Cards`);
+    for (let seatOffset = 0; seatOffset < PLAYER_COUNT; seatOffset++) {
+        const playerIndex =
+            (localIndex + seatOffset) % PLAYER_COUNT;
+        const player = players[playerIndex];
+        const playerBox = $(`player${seatOffset + 1}`);
 
-        if (!box) continue;
+        if (!player || !playerBox) continue;
 
-        box.innerHTML = "";
-
-        player.hand.forEach(
-            () => {
-                const back =
-                    document.createElement(
-                        "div"
-                    );
-
-                back.className =
-                    "back-card";
-
-                box.appendChild(
-                    back
-                );
-            }
-        );
-
-        const playerBox =
-            $(`player${i + 1}`);
-
-        if (playerBox) {
-            const status =
-                playerBox.querySelector(
-                    ".status"
-                );
-
-            if (status) {
-                status.textContent =
-                    currentPlayer === i
-                        ? "● TURN"
-                        : "";
+        // Keep the local player in the bottom seat and label others by name.
+        const heading = playerBox.querySelector("h2");
+        if (heading) {
+            const labelNode = Array.from(heading.childNodes).find(
+                node => node.nodeType === Node.TEXT_NODE
+            );
+            if (labelNode) {
+                labelNode.textContent =
+                    seatOffset === 0 ? "You " : `${player.name} `;
             }
         }
-    }
 
-    const player1Box =
-        $("player1");
-
-    if (player1Box) {
-        const status =
-            player1Box.querySelector(
-                ".status"
-            );
-
+        const status = playerBox.querySelector(".status");
         if (status) {
             status.textContent =
-                isMyTurn()
-                    ? "● YOUR TURN"
-                    : "";
+                seatOffset === 0
+                    ? (isMyTurn() ? "● YOUR TURN" : "")
+                    : (currentPlayer === playerIndex ? "● TURN" : "");
         }
+
+        // The local player's face-up hand is rendered separately in #hand.
+        if (seatOffset === 0) continue;
+
+        const cardsBox = $(`p${seatOffset + 1}Cards`);
+        if (!cardsBox) continue;
+
+        cardsBox.innerHTML = "";
+        player.hand.forEach(() => {
+            const back = document.createElement("div");
+            back.className = "back-card";
+            cardsBox.appendChild(back);
+        });
     }
 }
 
@@ -4918,8 +4902,15 @@ function renderMelds() {
         const player =
             players[i];
 
+        /*
+           Place this player's meld in their seat relative to the local
+           player. Player data remains indexed by the original playerIndex;
+           only the visual seat changes for online clients.
+        */
+        const seatOffset =
+            (i - getLocalPlayerIndex() + PLAYER_COUNT) % PLAYER_COUNT;
         const playerBox =
-            $(`player${i + 1}`);
+            $(`player${seatOffset + 1}`);
 
         if (!playerBox) {
             continue;
