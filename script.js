@@ -4,18 +4,6 @@ const RANKS = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"]
 const PLAYER_COUNT = 5;
 const HAND_SIZE = 8;
 
-// ONLINE MULTIPLAYER (rules are unchanged)
-let isOnlineGame = false;
-let myPlayerIndex = 0;
-let onlineRoomCode = "";
-let onlineSocket = null;
-let onlineHost = false;
-let suppressNetworkSync = false;
-let onlineForceFullState = false;
-function getLocalPlayerIndex(){ return isOnlineGame ? myPlayerIndex : 0; }
-function isMyTurn(){ return currentPlayer === getLocalPlayerIndex(); }
-
-
 let players = [];
 let deck = [];
 let discardPile = [];
@@ -98,7 +86,6 @@ let suffolCount = 0;
 const SAVE_KEY = "53CardGameSave_v1";
 
 function saveGame() {
-    if (isOnlineGame) return;
     if (!gameStarted) return;
 
     const state = {
@@ -230,7 +217,7 @@ function loadGame() {
 
         if (gameOver && lastRanking.length > 0) {
             showRoundScoreboard(lastRanking);
-        } else if (!isOnlineGame && currentPlayer !== 0) {
+        } else if (currentPlayer !== 0) {
             setTimeout(aiTurn, 500);
         }
 
@@ -888,7 +875,6 @@ function updateMeldVisibility() {
 ========================================================= */
 
 function newGame(resetMatch = true) {
-    if (isOnlineGame && onlineHost) onlineForceFullState = true;
     gameStarted = true;
 
     if (resetMatch) {
@@ -1044,15 +1030,11 @@ function newGame(resetMatch = true) {
             `${players[startingPlayer].name}'s first turn.`
         );
 
-        if (!isOnlineGame) {
-            setTimeout(
-                aiTurn,
-                900
-            );
-        }
+        setTimeout(
+            aiTurn,
+            900
+        );
     }
-
-    if (isOnlineGame) broadcastOnlineState();
 }
 
 
@@ -1094,7 +1076,6 @@ function render() {
     updateButtons();
     updateCompleteButton();
     saveGame();
-    if (isOnlineGame && !suppressNetworkSync) broadcastOnlineState();
 }
 
 
@@ -1135,10 +1116,10 @@ function renderTableIndicator() {
         cardText(indicator);
 
     if (
-        isMyTurn() &&
+        currentPlayer === 0 &&
         roundStartingPlayer === 0 &&
         !indicatorTaken &&
-        !firstTurnCompleted[getLocalPlayerIndex()] &&
+        !firstTurnCompleted[0] &&
         turnMode === null
     ) {
         card.title =
@@ -1159,11 +1140,11 @@ function renderTableIndicator() {
 
 function takeIndicator() {
     if (gameOver) return;
-    if (!isMyTurn()) return;
+    if (currentPlayer !== 0) return;
     if (roundStartingPlayer !== 0) return;
 
     if (
-        firstTurnCompleted[getLocalPlayerIndex()]
+        firstTurnCompleted[0]
     ) {
         return;
     }
@@ -1185,7 +1166,7 @@ function takeIndicator() {
         return;
     }
 
-    players[getLocalPlayerIndex()].hand.push(
+    players[0].hand.push(
         indicator
     );
 
@@ -1258,7 +1239,7 @@ function prepareDrawPile() {
 
 function drawCard() {
     if (gameOver) return;
-    if (!isMyTurn()) return;
+    if (currentPlayer !== 0) return;
 
     if (
         turnMode === "meld"
@@ -1293,7 +1274,7 @@ function drawCard() {
     const card =
         deck.pop();
 
-    players[getLocalPlayerIndex()].hand.push(
+    players[0].hand.push(
         card
     );
 
@@ -1326,7 +1307,7 @@ function drawCard() {
 
 function takeDiscard() {
     if (gameOver) return;
-    if (!isMyTurn()) return;
+    if (currentPlayer !== 0) return;
 
     if (
         turnMode === "meld"
@@ -1359,7 +1340,7 @@ function takeDiscard() {
     const card =
         discardPile.pop();
 
-    players[getLocalPlayerIndex()].hand.push(
+    players[0].hand.push(
         card
     );
 
@@ -1452,7 +1433,7 @@ function renderDiscardCards() {
             cardButton.classList.add("top-discard");
 
             if (
-                isMyTurn() &&
+                currentPlayer === 0 &&
                 turnMode !== "meld" &&
                 !hasDrawn &&
                 !gameOver
@@ -1510,7 +1491,7 @@ function renderHand() {
        Long-press (2 seconds) + drag lets you arrange your cards
        manually from left to right or right to left.
     */
-    players[getLocalPlayerIndex()].hand.forEach((card, index) => {
+    players[0].hand.forEach((card, index) => {
         const cardButton = document.createElement("button");
 
         cardButton.className = cardClass(card);
@@ -1535,7 +1516,7 @@ function renderHand() {
                The hand can be reordered/re-rendered, so using the
                old render-time index could select a different card.
             */
-            const currentIndex = players[getLocalPlayerIndex()].hand.findIndex(
+            const currentIndex = players[0].hand.findIndex(
                 currentCard =>
                     currentCard.id === cardButton.dataset.cardId
             );
@@ -1943,9 +1924,9 @@ function extendSpecificMeldWithCard(meld, card) {
 function tryDropDraggedCardOnMeld(pointerX, pointerY) {
     if (!handDragState) return false;
     if (gameOver) return false;
-    if (!isMyTurn()) return false;
-    if (hasDrawn) return false;
-    if (!licensed[getLocalPlayerIndex()]) return false;
+    if (currentPlayer !== 0) return false;
+    if (turnMode === "draw") return false;
+    if (!licensed[0]) return false;
 
     const target = getMeldDropTarget(pointerX, pointerY);
     if (!target) return false;
@@ -1961,7 +1942,7 @@ function tryDropDraggedCardOnMeld(pointerX, pointerY) {
     const targetMeld = targetPlayer && targetPlayer.melds[meldIndex];
     if (!targetMeld) return false;
 
-    const oldHand = players[getLocalPlayerIndex()].hand.slice();
+    const oldHand = players[0].hand.slice();
     const cardId = handDragState.cardId;
     const cardIndex = oldHand.findIndex(card => String(card.id) === String(cardId));
 
@@ -1977,14 +1958,14 @@ function tryDropDraggedCardOnMeld(pointerX, pointerY) {
         return true;
     }
 
-    players[getLocalPlayerIndex()].hand.splice(cardIndex, 1);
+    players[0].hand.splice(cardIndex, 1);
 
     selectedCards = selectedCards
         .map(index => oldHand[index])
         .filter(Boolean)
         .filter(selectedCard => selectedCard.id !== card.id)
         .map(selectedCard =>
-            players[getLocalPlayerIndex()].hand.findIndex(item => item.id === selectedCard.id)
+            players[0].hand.findIndex(item => item.id === selectedCard.id)
         )
         .filter(index => index >= 0);
 
@@ -2008,7 +1989,7 @@ function finishHandCardReorder() {
     const handBox = $("hand");
     if (!handBox || !players[0] || !handDragState) return;
 
-    const oldHand = players[getLocalPlayerIndex()].hand.slice();
+    const oldHand = players[0].hand.slice();
     const selectedIds = selectedCards
         .map(index => oldHand[index])
         .filter(Boolean)
@@ -2021,10 +2002,10 @@ function finishHandCardReorder() {
 
     if (newHand.length !== oldHand.length) return;
 
-    players[getLocalPlayerIndex()].hand = newHand;
+    players[0].hand = newHand;
 
     selectedCards = selectedIds
-        .map(id => players[getLocalPlayerIndex()].hand.findIndex(card => card.id === id))
+        .map(id => players[0].hand.findIndex(card => card.id === id))
         .filter(index => index >= 0);
 
     saveGame();
@@ -2125,7 +2106,7 @@ function renderPlayers() {
 
         if (status) {
             status.textContent =
-                isMyTurn()
+                currentPlayer === 0
                     ? "● YOUR TURN"
                     : "";
         }
@@ -3068,7 +3049,7 @@ function extendExistingMeld(
 
 function makeMeld() {
     if (gameOver) return;
-    if (!isMyTurn()) return;
+    if (currentPlayer !== 0) return;
 
     if (
         turnMode === "draw"
@@ -3089,7 +3070,7 @@ function makeMeld() {
     const cards =
         selectedCards.map(
             index =>
-                players[getLocalPlayerIndex()].hand[index]
+                players[0].hand[index]
         );
 
 
@@ -3098,7 +3079,7 @@ function makeMeld() {
     ===================================================== */
 
     if (
-        licensed[getLocalPlayerIndex()] &&
+        licensed[0] &&
         selectedCards.length >= 1
     ) {
         const result =
@@ -3114,7 +3095,7 @@ function makeMeld() {
 
             indexes.forEach(
                 index => {
-                    players[getLocalPlayerIndex()].hand.splice(
+                    players[0].hand.splice(
                         index,
                         1
                     );
@@ -3157,7 +3138,7 @@ function makeMeld() {
         selectedCards.length < 3
     ) {
         if (
-            !licensed[getLocalPlayerIndex()]
+            !licensed[0]
         ) {
             setMessage(
                 "You need to show a 3 or more card meld first to get your license."
@@ -3201,15 +3182,15 @@ function makeMeld() {
         true
     );
 
-   players[getLocalPlayerIndex()].melds.push(
-    newMeld
-);
+    players[0].melds.push(
+        newMeld
+    );
 
 
     if (
         newMeld.length >= 3
     ) {
-        licensed[getLocalPlayerIndex()] =
+        licensed[0] =
             true;
     }
 
@@ -3221,7 +3202,7 @@ function makeMeld() {
        During first turn, cards stay in hand.
     */
     if (
-        meldsRevealed[getLocalPlayerIndex()]
+        meldsRevealed[0]
     ) {
         const indexes =
             [...selectedCards].sort(
@@ -3230,7 +3211,7 @@ function makeMeld() {
 
         indexes.forEach(
             index => {
-                players[getLocalPlayerIndex()].hand.splice(
+                players[0].hand.splice(
                     index,
                     1
                 );
@@ -3259,7 +3240,7 @@ function makeMeld() {
        cards are still in the player's hand.
     */
     if (
-        meldsRevealed[getLocalPlayerIndex()] &&
+        meldsRevealed[0] &&
         checkGameOver()
     ) {
         return;
@@ -3267,10 +3248,10 @@ function makeMeld() {
 
 
     if (
-        licensed[getLocalPlayerIndex()]
+        licensed[0]
     ) {
         if (
-            firstTurnCompleted[getLocalPlayerIndex()]
+            firstTurnCompleted[0]
         ) {
             setMessage(
                 "Meld created. LICENSE obtained."
@@ -3296,7 +3277,7 @@ function makeMeld() {
 
 function discardSelected() {
     if (gameOver) return;
-    if (!isMyTurn()) return;
+    if (currentPlayer !== 0) return;
 
     if (
         turnMode !== "draw"
@@ -3340,7 +3321,7 @@ function discardSelected() {
     if (
         index < 0 ||
         index >=
-            players[getLocalPlayerIndex()].hand.length
+            players[0].hand.length
     ) {
         selectedCards = [];
 
@@ -3354,7 +3335,7 @@ function discardSelected() {
     }
 
     const card =
-        players[getLocalPlayerIndex()].hand.splice(
+        players[0].hand.splice(
             index,
             1
         )[0];
@@ -3453,7 +3434,7 @@ function updateCompleteButton() {
     let enabled = false;
 
     if (
-        isMyTurn() &&
+        currentPlayer === 0 &&
         !gameOver
     ) {
         if (
@@ -3483,7 +3464,7 @@ function updateCompleteButton() {
 
 function completeTurn() {
     if (gameOver) return;
-    if (!isMyTurn()) return;
+    if (currentPlayer !== 0) return;
 
     /*
        FIRST TURN MUST ALWAYS HAVE
@@ -3494,7 +3475,7 @@ function completeTurn() {
     */
 
     if (
-        !firstTurnCompleted[getLocalPlayerIndex()]
+        !firstTurnCompleted[0]
     ) {
         if (!hasDrawn) {
             setMessage(
@@ -3547,7 +3528,7 @@ function completeTurn() {
            cannot complete the turn.
         */
         if (
-            !firstTurnCompleted[getLocalPlayerIndex()]
+            !firstTurnCompleted[0]
         ) {
             if (!hasDrawn) {
                 setMessage(
@@ -3577,16 +3558,16 @@ function completeTurn() {
 
 
     if (
-        !firstTurnCompleted[getLocalPlayerIndex()]
+        !firstTurnCompleted[0]
     ) {
-        firstTurnCompleted[getLocalPlayerIndex()] =
+        firstTurnCompleted[0] =
             true;
     }
 
 
     resetTurnState();
 
-    currentPlayer = (getLocalPlayerIndex() - 1 + PLAYER_COUNT) % PLAYER_COUNT;
+    currentPlayer = (0 - 1 + PLAYER_COUNT) % PLAYER_COUNT;
 
     updateMeldVisibility();
 
@@ -3598,13 +3579,10 @@ function completeTurn() {
         `${players[currentPlayer].name === "Player 1" ? "Your" : players[currentPlayer].name}'s turn.`
     );
 
-    if (!isOnlineGame) {
-        setTimeout(
-            aiTurn,
-            900
-        );
-    }
-    if (isOnlineGame) broadcastOnlineState();
+    setTimeout(
+        aiTurn,
+        900
+    );
 }
 
 
@@ -3613,7 +3591,6 @@ function completeTurn() {
 ========================================================= */
 
 function aiTurn() {
-    if (isOnlineGame) return;
     if (gameOver) return;
     if (currentPlayer === 0) return;
 
@@ -4887,7 +4864,7 @@ function finishAITurn(
     render();
 
     if (
-        isMyTurn()
+        currentPlayer === 0
     ) {
         setMessage(
             "Your turn."
@@ -5015,7 +4992,7 @@ function renderMelds() {
 ========================================================= */
 
 function sortHand() {
-    players[getLocalPlayerIndex()].hand.sort(
+    players[0].hand.sort(
         (a, b) => {
             if (
                 a.rank === "JOKER"
@@ -5084,7 +5061,7 @@ function updateButtons() {
 
     if (drawBtn) {
         drawBtn.disabled =
-            !isMyTurn() ||
+            currentPlayer !== 0 ||
             turnMode === "meld" ||
             hasDrawn ||
             gameOver;
@@ -5093,7 +5070,7 @@ function updateButtons() {
 
     if (takeDiscardBtn) {
         takeDiscardBtn.disabled =
-            !isMyTurn() ||
+            currentPlayer !== 0 ||
             turnMode === "meld" ||
             hasDrawn ||
             discardPile.length === 0 ||
@@ -5103,7 +5080,7 @@ function updateButtons() {
 
     if (discardBtn) {
         discardBtn.disabled =
-            !isMyTurn() ||
+            currentPlayer !== 0 ||
             turnMode !== "draw" ||
             !hasDrawn ||
             hasDiscarded ||
@@ -5114,7 +5091,7 @@ function updateButtons() {
 
     if (makeMeldBtn) {
         makeMeldBtn.disabled =
-            !isMyTurn() ||
+            currentPlayer !== 0 ||
             turnMode === "draw" ||
             selectedCards.length < 1 ||
             gameOver;
@@ -5144,59 +5121,6 @@ function setMessage(
 /* =========================================================
    START GAME
 ========================================================= */
-
-
-/* =========================================================
-   ONLINE MULTIPLAYER
-========================================================= */
-function broadcastOnlineState(){
-    if(!isOnlineGame || suppressNetworkSync || !onlineSocket || onlineSocket.readyState!==WebSocket.OPEN) return;
-    const forceFull = onlineForceFullState && onlineHost;
-    onlineSocket.send(JSON.stringify({type:"state",roomCode:onlineRoomCode,forceFull,state:{
-        players,deck,discardPile,indicator,indicatorAvailable,indicatorTaken,roundStartingPlayer,universalRank,currentPlayer,
-        selectedCards:[],hasDrawn,hasDiscarded,turnMode,turnActionMade,turnMeldMade,firstTurnCompleted,meldsRevealed,licensed,
-        gameOver,gameWinner,gameStarted,lastRanking,roundScores,suffolCount,message:$('message')?$('message').textContent:""
-    }}));
-    onlineForceFullState = false;
-}
-function applyOnlineState(st){
-    if(!st || !Array.isArray(st.players) || st.players.length!==PLAYER_COUNT) return;
-    suppressNetworkSync=true;
-    try{
-        players=st.players; deck=st.deck||[]; discardPile=st.discardPile||[]; indicator=st.indicator||null;
-        indicatorAvailable=!!st.indicatorAvailable; indicatorTaken=!!st.indicatorTaken; roundStartingPlayer=Number.isInteger(st.roundStartingPlayer)?st.roundStartingPlayer:0;
-        universalRank=st.universalRank||null; currentPlayer=Number.isInteger(st.currentPlayer)?st.currentPlayer:0;
-        hasDrawn=!!st.hasDrawn; hasDiscarded=!!st.hasDiscarded; turnMode=st.turnMode||null; turnActionMade=!!st.turnActionMade; turnMeldMade=!!st.turnMeldMade;
-        firstTurnCompleted=Array.isArray(st.firstTurnCompleted)?st.firstTurnCompleted:[false,false,false,false,false];
-        meldsRevealed=Array.isArray(st.meldsRevealed)?st.meldsRevealed:[false,false,false,false,false];
-        licensed=Array.isArray(st.licensed)?st.licensed:[false,false,false,false,false]; gameOver=!!st.gameOver; gameWinner=Number.isInteger(st.gameWinner)?st.gameWinner:-1;
-        gameStarted=!!st.gameStarted; lastRanking=Array.isArray(st.lastRanking)?st.lastRanking:[]; roundScores=Array.isArray(st.roundScores)?st.roundScores:[]; suffolCount=Number.isInteger(st.suffolCount)?st.suffolCount:0; selectedCards=[];
-        render(); if(st.message) setMessage(st.message);
-        if(gameOver && lastRanking.length) showRoundScoreboard(lastRanking);
-    }finally{ suppressNetworkSync=false; }
-}
-function onlineStatus(t){const e=$("onlineStatus");if(e)e.textContent=t;}
-function showOnlinePanel(){
-    const card=document.querySelector("#mainMenu .menu-card"); if(!card || $("onlinePanel")) return;
-    const p=document.createElement("div"); p.id="onlinePanel"; p.style.marginTop="18px";
-    p.innerHTML='<div style="font-weight:800;margin-bottom:8px">ONLINE 5 PLAYER</div><button id="createOnlineBtn" class="menu-button menu-new-game" type="button">CREATE GAME</button><div style="display:flex;gap:8px;margin-top:12px"><input id="roomCodeInput" maxlength="6" placeholder="ROOM CODE" style="flex:1;padding:13px;border:1px solid #ccd2dc;border-radius:10px;text-align:center;text-transform:uppercase;font-weight:700"><button id="joinOnlineBtn" class="menu-button menu-resume" type="button" style="width:auto;margin:0;padding:0 18px">JOIN</button></div><div id="onlineStatus" style="min-height:22px;margin-top:12px;color:#687386;font-size:13px"></div>';
-    card.appendChild(p); $("createOnlineBtn").onclick=()=>connectOnline("create"); $("joinOnlineBtn").onclick=()=>connectOnline("join",$("roomCodeInput").value.trim().toUpperCase());
-}
-function connectOnline(mode,room){
-    if(onlineSocket && onlineSocket.readyState===WebSocket.OPEN) onlineSocket.close();
-    isOnlineGame=true; onlineHost=mode==="create"; onlineStatus(mode==="create"?"Creating room...":"Joining room...");
-    const proto=location.protocol==="https:"?"wss:":"ws:"; onlineSocket=new WebSocket(proto+"//"+location.host);
-    onlineSocket.onopen=()=>onlineSocket.send(JSON.stringify({type:mode==="create"?"create_room":"join_room",roomCode:room||""}));
-    onlineSocket.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch{return}
-        if(m.type==="room_created"||m.type==="joined"){onlineRoomCode=m.roomCode;myPlayerIndex=m.playerIndex;onlineStatus(`Room ${onlineRoomCode} • You are Player ${myPlayerIndex+1}. Waiting for 5 players...`);return;}
-        if(m.type==="room_status"){onlineStatus(`Room ${onlineRoomCode} • ${m.count}/5 players connected.`);return;}
-        if(m.type==="room_full"&&onlineHost){onlineStatus(`Room ${onlineRoomCode} is full. Starting game...`);newGame(true);return;}
-        if(m.type==="state"){applyOnlineState(m.state);const menu=$("mainMenu"),game=$("gameScreen");if(menu)menu.style.display="none";if(game)game.style.display="block";return;}
-        if(m.type==="error") onlineStatus(m.message||"Online error.");
-        if(m.type==="player_left") onlineStatus(`Player ${m.playerIndex+1} disconnected. Waiting for reconnection...`);
-    };
-    onlineSocket.onclose=()=>{if(isOnlineGame)onlineStatus("Connection closed.");}; onlineSocket.onerror=()=>onlineStatus("Could not connect to multiplayer server.");
-}
 
 document.addEventListener(
     "DOMContentLoaded",
@@ -5321,13 +5245,7 @@ document.addEventListener(
         if (newGameBtn) {
             newGameBtn.addEventListener(
                 "click",
-                () => {
-                    if (isOnlineGame && !onlineHost) {
-                        setMessage("Only the room creator can start a new game.");
-                        return;
-                    }
-                    newGame(isOnlineGame ? false : true);
-                }
+                newGame
             );
         }
 
@@ -5380,6 +5298,5 @@ document.addEventListener(
         */
         showMenuScreen();
         updateResumeButton();
-        showOnlinePanel();
     }
 );
