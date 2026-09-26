@@ -5148,31 +5148,170 @@ function setMessage(
 /* =========================================================
    ONLINE MULTIPLAYER
 ========================================================= */
-function broadcastOnlineState(){
-    if(!isOnlineGame || suppressNetworkSync || !onlineSocket || onlineSocket.readyState!==WebSocket.OPEN) return;
+function broadcastOnlineState() {
+    if (
+        !isOnlineGame ||
+        suppressNetworkSync ||
+        !onlineSocket ||
+        onlineSocket.readyState !== WebSocket.OPEN
+    ) return;
+
     const forceFull = onlineForceFullState && onlineHost;
-    onlineSocket.send(JSON.stringify({type:"state",roomCode:onlineRoomCode,forceFull,state:{
-        players,deck,discardPile,indicator,indicatorAvailable,indicatorTaken,roundStartingPlayer,universalRank,currentPlayer,
-        selectedCards:[],hasDrawn,hasDiscarded,turnMode,turnActionMade,turnMeldMade,firstTurnCompleted,meldsRevealed,licensed,
-        gameOver,gameWinner,gameStarted,lastRanking,roundScores,suffolCount,message:$('message')?$('message').textContent:""
-    }}));
+
+    const meldMetadata = players.map(player =>
+        player.melds.map(meld => ({
+            meldType: meld.meldType,
+            sequenceStart: meld.sequenceStart,
+            sequenceEnd: meld.sequenceEnd,
+            sequenceSuit: meld.sequenceSuit,
+            sequenceCardPositions:
+                Array.isArray(meld.sequenceCardPositions)
+                    ? [...meld.sequenceCardPositions]
+                    : null,
+            sequenceJokerPositions:
+                Array.isArray(meld.sequenceJokerPositions)
+                    ? [...meld.sequenceJokerPositions]
+                    : null
+        }))
+    );
+
+    onlineSocket.send(JSON.stringify({
+        type: "state",
+        roomCode: onlineRoomCode,
+        forceFull,
+        state: {
+            players,
+            meldMetadata,
+            deck,
+            discardPile,
+            indicator,
+            indicatorAvailable,
+            indicatorTaken,
+            roundStartingPlayer,
+            universalRank,
+            currentPlayer,
+            selectedCards: [],
+            hasDrawn,
+            hasDiscarded,
+            turnMode,
+            turnActionMade,
+            turnMeldMade,
+            firstTurnCompleted,
+            meldsRevealed,
+            licensed,
+            gameOver,
+            gameWinner,
+            gameStarted,
+            lastRanking,
+            roundScores,
+            suffolCount,
+            message: $("message")
+                ? $("message").textContent
+                : ""
+        }
+    }));
+
     onlineForceFullState = false;
 }
-function applyOnlineState(st){
-    if(!st || !Array.isArray(st.players) || st.players.length!==PLAYER_COUNT) return;
-    suppressNetworkSync=true;
-    try{
-        players=st.players; deck=st.deck||[]; discardPile=st.discardPile||[]; indicator=st.indicator||null;
-        indicatorAvailable=!!st.indicatorAvailable; indicatorTaken=!!st.indicatorTaken; roundStartingPlayer=Number.isInteger(st.roundStartingPlayer)?st.roundStartingPlayer:0;
-        universalRank=st.universalRank||null; currentPlayer=Number.isInteger(st.currentPlayer)?st.currentPlayer:0;
-        hasDrawn=!!st.hasDrawn; hasDiscarded=!!st.hasDiscarded; turnMode=st.turnMode||null; turnActionMade=!!st.turnActionMade; turnMeldMade=!!st.turnMeldMade;
-        firstTurnCompleted=Array.isArray(st.firstTurnCompleted)?st.firstTurnCompleted:[false,false,false,false,false];
-        meldsRevealed=Array.isArray(st.meldsRevealed)?st.meldsRevealed:[false,false,false,false,false];
-        licensed=Array.isArray(st.licensed)?st.licensed:[false,false,false,false,false]; gameOver=!!st.gameOver; gameWinner=Number.isInteger(st.gameWinner)?st.gameWinner:-1;
-        gameStarted=!!st.gameStarted; lastRanking=Array.isArray(st.lastRanking)?st.lastRanking:[]; roundScores=Array.isArray(st.roundScores)?st.roundScores:[]; suffolCount=Number.isInteger(st.suffolCount)?st.suffolCount:0; selectedCards=[];
-        render(); if(st.message) setMessage(st.message);
-        if(gameOver && lastRanking.length) showRoundScoreboard(lastRanking);
-    }finally{ suppressNetworkSync=false; }
+
+function applyOnlineState(st) {
+    if (
+        !st ||
+        !Array.isArray(st.players) ||
+        st.players.length !== PLAYER_COUNT
+    ) return;
+
+    suppressNetworkSync = true;
+
+    try {
+        players = st.players;
+
+        // Restore meld metadata received from the online host.
+        players.forEach((player, playerIndex) => {
+            if (!player || !Array.isArray(player.melds)) return;
+
+            player.melds.forEach((meld, meldIndex) => {
+                const metadata =
+                    st.meldMetadata?.[playerIndex]?.[meldIndex];
+
+                if (metadata) {
+                    Object.assign(meld, metadata);
+                }
+            });
+        });
+
+        deck = st.deck || [];
+        discardPile = st.discardPile || [];
+        indicator = st.indicator || null;
+
+        indicatorAvailable = !!st.indicatorAvailable;
+        indicatorTaken = !!st.indicatorTaken;
+
+        roundStartingPlayer =
+            Number.isInteger(st.roundStartingPlayer)
+                ? st.roundStartingPlayer
+                : 0;
+
+        universalRank = st.universalRank || null;
+
+        currentPlayer =
+            Number.isInteger(st.currentPlayer)
+                ? st.currentPlayer
+                : 0;
+
+        hasDrawn = !!st.hasDrawn;
+        hasDiscarded = !!st.hasDiscarded;
+        turnMode = st.turnMode || null;
+        turnActionMade = !!st.turnActionMade;
+        turnMeldMade = !!st.turnMeldMade;
+
+        firstTurnCompleted =
+            Array.isArray(st.firstTurnCompleted)
+                ? st.firstTurnCompleted
+                : [false, false, false, false, false];
+
+        meldsRevealed =
+            Array.isArray(st.meldsRevealed)
+                ? st.meldsRevealed
+                : [false, false, false, false, false];
+
+        licensed =
+            Array.isArray(st.licensed)
+                ? st.licensed
+                : [false, false, false, false, false];
+
+        gameOver = !!st.gameOver;
+        gameWinner =
+            Number.isInteger(st.gameWinner)
+                ? st.gameWinner
+                : -1;
+
+        gameStarted = !!st.gameStarted;
+
+        lastRanking = Array.isArray(st.lastRanking)
+            ? st.lastRanking
+            : [];
+
+        roundScores = Array.isArray(st.roundScores)
+            ? st.roundScores
+            : [];
+
+        suffolCount = Number.isInteger(st.suffolCount)
+            ? st.suffolCount
+            : 0;
+
+        selectedCards = [];
+
+        render();
+
+        if (st.message) setMessage(st.message);
+
+        if (gameOver && lastRanking.length) {
+            showRoundScoreboard(lastRanking);
+        }
+    } finally {
+        suppressNetworkSync = false;
+    }
 }
 function onlineStatus(t){const e=$("onlineStatus");if(e)e.textContent=t;}
 function showOnlinePanel(){
