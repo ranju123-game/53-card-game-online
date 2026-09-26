@@ -1945,8 +1945,7 @@ function tryDropDraggedCardOnMeld(pointerX, pointerY) {
     if (gameOver) return false;
     if (!isMyTurn()) return false;
     if (turnMode === "draw") return false;
-    if (!licensed[getLocalPlayerIndex()]) return false;
-
+    
     const target = getMeldDropTarget(pointerX, pointerY);
     if (!target) return false;
 
