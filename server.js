@@ -78,23 +78,37 @@ function mergeClientState(room, incoming, senderIndex) {
 
   const old = room.state;
   const next = incoming;
-  for (const key of [
-    'deck','discardPile','indicator','indicatorAvailable','indicatorTaken',
-    'roundStartingPlayer','universalRank','currentPlayer','hasDrawn','hasDiscarded',
-    'turnMode','turnActionMade','turnMeldMade','firstTurnCompleted','meldsRevealed',
-    'licensed','gameOver','gameWinner','gameStarted','lastRanking','roundScores','suffolCount','message'
-  ]) {
-    if (Object.prototype.hasOwnProperty.call(next, key)) old[key] = next[key];
+
+  // Only the player whose turn it currently is may update shared game state.
+  // This prevents an out-of-date snapshot from another browser from restoring
+  // cards to the draw pile (which could make the same card appear twice).
+  const isActivePlayer = Number(senderIndex) === Number(old.currentPlayer);
+
+  if (isActivePlayer) {
+    for (const key of [
+      'deck','discardPile','indicator','indicatorAvailable','indicatorTaken',
+      'roundStartingPlayer','universalRank','currentPlayer','hasDrawn','hasDiscarded',
+      'turnMode','turnActionMade','turnMeldMade','firstTurnCompleted','meldsRevealed',
+      'licensed','gameOver','gameWinner','gameStarted','lastRanking','roundScores','suffolCount','message'
+    ]) {
+      if (Object.prototype.hasOwnProperty.call(next, key)) old[key] = next[key];
+    }
   }
 
-  // Only the sender's hand is accepted. Melds are public and may be changed by a player.
   if (Array.isArray(old.players) && Array.isArray(next.players)) {
-    if (next.players[senderIndex] && Array.isArray(next.players[senderIndex].hand)) {
+    // Hand and meld changes are accepted only from the active player. A player
+    // can still update their display name while it is someone else's turn.
+    if (isActivePlayer && next.players[senderIndex] && Array.isArray(next.players[senderIndex].hand)) {
       old.players[senderIndex].hand = next.players[senderIndex].hand;
+    }
+    if (isActivePlayer) {
+      next.players.forEach((p, i) => {
+        if (!old.players[i] || !p) return;
+        if (Array.isArray(p.melds)) old.players[i].melds = p.melds;
+      });
     }
     next.players.forEach((p, i) => {
       if (!old.players[i] || !p) return;
-      if (Array.isArray(p.melds)) old.players[i].melds = p.melds;
       if (typeof p.name === 'string') old.players[i].name = p.name;
     });
   }
