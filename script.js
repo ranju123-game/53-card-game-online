@@ -1144,7 +1144,7 @@ function renderTableIndicator() {
 
     if (
         isMyTurn() &&
-        roundStartingPlayer === 0 &&
+        roundStartingPlayer === getLocalPlayerIndex() &&
         !indicatorTaken &&
         !firstTurnCompleted[getLocalPlayerIndex()] &&
         turnMode === null
@@ -1168,7 +1168,7 @@ function renderTableIndicator() {
 function takeIndicator() {
     if (gameOver) return;
     if (!isMyTurn()) return;
-    if (roundStartingPlayer !== 0) return;
+    if (roundStartingPlayer !== getLocalPlayerIndex()) return;
 
     if (
         firstTurnCompleted[getLocalPlayerIndex()]
