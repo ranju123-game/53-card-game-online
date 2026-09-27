@@ -2348,17 +2348,11 @@ function isValidMeld(
                     normalCards[0].rank
             );
 
-        const differentSuits =
-            new Set(
-                normalCards.map(
-                    card => card.suit
-                )
-            ).size ===
-            normalCards.length;
-
+        // A set is valid when all non-joker cards have the same rank.
+        // Do not require different suits: jokers and the game's set rule
+        // determine validity, not suit uniqueness.
         if (
-            sameRank &&
-            differentSuits
+            sameRank
         ) {
             if (
                 normalCards.length <= 4
