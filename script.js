@@ -2079,19 +2079,32 @@ function renderPlayers() {
     */
     const localIndex = getLocalPlayerIndex();
 
-    // Visual seat order in the HTML:
-    // bottom (You), bottom-right, top-right, top-left, bottom-left.
-    // From each player's view, the left neighbor is the next player (+1)
-    // and the right neighbor is the previous player (+4).
-    // This changes only which real player's label/cards appear in each seat;
-    // it does not change actual player indexes or clockwise turn order.
-    const playerOffsetBySeat = [0, 4, 3, 2, 1];
+    // The HTML seat IDs are positioned as follows:
+    // #player1 = bottom (You)
+    // #player2 = bottom-right (your right neighbor: previous player)
+    // #player3 = top-right
+    // #player4 = top-left
+    // #player5 = bottom-left (your left neighbor: next player)
+    //
+    // Therefore, when Player 1 is at the bottom:
+    // left = Player 2, then top-left = Player 3,
+    // top-right = Player 4, and right = Player 5.
+    // This only rotates which real player is displayed in each seat;
+    // it does NOT change player indexes or clockwise turn order.
+    const playerOffsetBySeatId = {
+        player1: 0,
+        player2: 4,
+        player3: 3,
+        player4: 2,
+        player5: 1
+    };
 
     for (let seatOffset = 0; seatOffset < PLAYER_COUNT; seatOffset++) {
+        const seatId = `player${seatOffset + 1}`;
         const playerIndex =
-            (localIndex + playerOffsetBySeat[seatOffset]) % PLAYER_COUNT;
+            (localIndex + playerOffsetBySeatId[seatId]) % PLAYER_COUNT;
         const player = players[playerIndex];
-        const playerBox = $(`player${seatOffset + 1}`);
+        const playerBox = $(seatId);
 
         if (!player || !playerBox) continue;
 
