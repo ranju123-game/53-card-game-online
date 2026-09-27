@@ -12,6 +12,13 @@ let onlineSocket = null;
 let onlineHost = false;
 let suppressNetworkSync = false;
 let onlineForceFullState = false;
+let onlineReconnectTimer = null;
+let onlineReconnectAttempts = 0;
+let onlineIntentionalClose = false;
+const ONLINE_SESSION_KEY = "cardGameOnlineSession_v1";
+function getSavedOnlineSession(){ try { return JSON.parse(localStorage.getItem(ONLINE_SESSION_KEY) || "null"); } catch { return null; } }
+function saveOnlineSession(){ try { localStorage.setItem(ONLINE_SESSION_KEY, JSON.stringify({ roomCode: onlineRoomCode, token: onlineReconnectToken, isHost: onlineHost })); } catch {} }
+let onlineReconnectToken = "";
 function getLocalPlayerIndex(){ return isOnlineGame ? myPlayerIndex : 0; }
 function isMyTurn(){ return currentPlayer === getLocalPlayerIndex(); }
 
@@ -5223,20 +5230,72 @@ function showOnlinePanel(){
     p.innerHTML='<div style="font-weight:800;margin-bottom:8px">ONLINE 5 PLAYER</div><button id="createOnlineBtn" class="menu-button menu-new-game" type="button">CREATE GAME</button><div style="display:flex;gap:8px;margin-top:12px"><input id="roomCodeInput" maxlength="6" placeholder="ROOM CODE" style="flex:1;padding:13px;border:1px solid #ccd2dc;border-radius:10px;text-align:center;text-transform:uppercase;font-weight:700"><button id="joinOnlineBtn" class="menu-button menu-resume" type="button" style="width:auto;margin:0;padding:0 18px">JOIN</button></div><div id="onlineStatus" style="min-height:22px;margin-top:12px;color:#687386;font-size:13px"></div>';
     card.appendChild(p); $("createOnlineBtn").onclick=()=>connectOnline("create"); $("joinOnlineBtn").onclick=()=>connectOnline("join",$("roomCodeInput").value.trim().toUpperCase());
 }
-function connectOnline(mode,room){
-    if(onlineSocket && onlineSocket.readyState===WebSocket.OPEN) onlineSocket.close();
-    isOnlineGame=true; onlineHost=mode==="create"; onlineStatus(mode==="create"?"Creating room...":"Joining room...");
-    const proto=location.protocol==="https:"?"wss:":"ws:"; onlineSocket=new WebSocket(proto+"//"+location.host);
-    onlineSocket.onopen=()=>onlineSocket.send(JSON.stringify({type:mode==="create"?"create_room":"join_room",roomCode:room||""}));
-    onlineSocket.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch{return}
-        if(m.type==="room_created"||m.type==="joined"){onlineRoomCode=m.roomCode;myPlayerIndex=m.playerIndex;onlineStatus(`Room ${onlineRoomCode} • You are Player ${myPlayerIndex+1}. Waiting for 5 players...`);return;}
+function connectOnline(mode,room,automaticReconnect=false){
+    if(onlineReconnectTimer){clearTimeout(onlineReconnectTimer);onlineReconnectTimer=null;}
+    if(onlineSocket && onlineSocket.readyState===WebSocket.OPEN){
+        onlineIntentionalClose=true;
+        onlineSocket.close();
+    }
+    const saved=getSavedOnlineSession();
+    const requestedRoom=String(room||"").trim().toUpperCase();
+    const canResume=mode==="join" && saved && saved.token && saved.roomCode===requestedRoom;
+    const useResume=automaticReconnect || canResume;
+    if(useResume && saved){onlineRoomCode=saved.roomCode;onlineReconnectToken=saved.token;onlineHost=!!saved.isHost;}
+    else if(!automaticReconnect){onlineRoomCode="";onlineReconnectToken="";onlineHost=mode==="create";}
+    onlineIntentionalClose=false;
+    isOnlineGame=true;
+    onlineStatus(useResume?"Reconnecting to your game...":(mode==="create"?"Creating room...":"Joining room..."));
+    const proto=location.protocol==="https:"?"wss:":"ws:";
+    const socket=new WebSocket(proto+"//"+location.host);
+    onlineSocket=socket;
+    socket.onopen=()=>{
+        if(onlineSocket!==socket)return;
+        if(useResume && onlineRoomCode && onlineReconnectToken){
+            socket.send(JSON.stringify({type:"reconnect",roomCode:onlineRoomCode,token:onlineReconnectToken}));
+        }else{
+            socket.send(JSON.stringify({type:mode==="create"?"create_room":"join_room",roomCode:requestedRoom||""}));
+        }
+    };
+    socket.onmessage=e=>{if(onlineSocket!==socket)return;let m;try{m=JSON.parse(e.data)}catch{return;}
+        if(m.type==="room_created"||m.type==="joined"||m.type==="reconnected"){
+            onlineRoomCode=m.roomCode;myPlayerIndex=m.playerIndex;
+            if(m.token)onlineReconnectToken=m.token;
+            if(typeof m.isHost==="boolean")onlineHost=m.isHost;
+            saveOnlineSession();
+            onlineReconnectAttempts=0;
+            onlineStatus(`Room ${onlineRoomCode} • You are Player ${myPlayerIndex+1}. ${m.state?"Game resumed.":"Waiting for 5 players..."}`);
+            if(m.state){applyOnlineState(m.state);const menu=$("mainMenu"),game=$("gameScreen");if(menu)menu.style.display="none";if(game)game.style.display="block";}
+            return;
+        }
         if(m.type==="room_status"){onlineStatus(`Room ${onlineRoomCode} • ${m.count}/5 players connected.`);return;}
-        if(m.type==="room_full"&&onlineHost){onlineStatus(`Room ${onlineRoomCode} is full. Starting game...`);newGame(true);return;}
-        if(m.type==="state"){applyOnlineState(m.state);const menu=$("mainMenu"),game=$("gameScreen");if(menu)menu.style.display="none";if(game)game.style.display="block";return;}
-        if(m.type==="error") onlineStatus(m.message||"Online error.");
+        // A room becoming full starts only a brand-new game, never a resumed game.
+        if(m.type==="room_full"&&onlineHost){
+            if(!gameStarted && !m.gameAlreadyStarted){onlineStatus(`Room ${onlineRoomCode} is full. Starting game...`);newGame(true);}
+            return;
+        }
+        if(m.type==="state"){
+            applyOnlineState(m.state);const menu=$("mainMenu"),game=$("gameScreen");if(menu)menu.style.display="none";if(game)game.style.display="block";return;
+        }
+        if(m.type==="error"){
+            onlineStatus(m.message||"Online error.");
+            if(m.code==="RESUME_EXPIRED" || m.code==="ROOM_NOT_FOUND"){
+                try{localStorage.removeItem(ONLINE_SESSION_KEY);}catch{}
+                onlineReconnectToken="";
+            }
+            return;
+        }
         if(m.type==="player_left") onlineStatus(`Player ${m.playerIndex+1} disconnected. Waiting for reconnection...`);
     };
-    onlineSocket.onclose=()=>{if(isOnlineGame)onlineStatus("Connection closed.");}; onlineSocket.onerror=()=>onlineStatus("Could not connect to multiplayer server.");
+    socket.onclose=()=>{
+        if(onlineSocket!==socket || onlineIntentionalClose)return;
+        if(isOnlineGame && onlineRoomCode && onlineReconnectToken){
+            onlineStatus("Connection lost. Reconnecting automatically...");
+            if(onlineReconnectTimer)clearTimeout(onlineReconnectTimer);
+            onlineReconnectAttempts++;
+            onlineReconnectTimer=setTimeout(()=>connectOnline("join",onlineRoomCode,true),Math.min(1000+onlineReconnectAttempts*1000,5000));
+        }else if(isOnlineGame)onlineStatus("Connection closed. Rejoin using your room code.");
+    };
+    socket.onerror=()=>{if(onlineSocket===socket)onlineStatus("Connection problem. Trying to reconnect...");};
 }
 
 document.addEventListener(
