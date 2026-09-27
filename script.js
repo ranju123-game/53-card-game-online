@@ -2079,12 +2079,13 @@ function renderPlayers() {
     */
     const localIndex = getLocalPlayerIndex();
 
-    // Visual seat order around the table:
-    // bottom (You), top-right, top-left, bottom-left, bottom-right.
-    // Clockwise numbering means the local player's left neighbor is +1,
-    // and the right neighbor is +4. Map actual players to those visual seats
-    // without changing the game's real player indexes or turn order.
-    const playerOffsetBySeat = [0, 3, 2, 1, 4];
+    // Visual seat order in the HTML:
+    // bottom (You), bottom-right, top-right, top-left, bottom-left.
+    // From each player's view, the left neighbor is the next player (+1)
+    // and the right neighbor is the previous player (+4).
+    // This changes only which real player's label/cards appear in each seat;
+    // it does not change actual player indexes or clockwise turn order.
+    const playerOffsetBySeat = [0, 4, 3, 2, 1];
 
     for (let seatOffset = 0; seatOffset < PLAYER_COUNT; seatOffset++) {
         const playerIndex =
