@@ -1,12 +1,15 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const WebSocket = require('ws');
 
 const PORT = process.env.PORT || 3000;
 const ROOT = __dirname;
 const rooms = new Map();
 const PLAYER_COUNT = 5;
+const RECONNECT_GRACE_MS = 5 * 60 * 1000;
+const EMPTY_ROOM_GRACE_MS = 10 * 60 * 1000;
 
 function roomCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -18,19 +21,26 @@ function roomCode() {
   return code;
 }
 
+function newToken() {
+  return crypto.randomBytes(24).toString('hex');
+}
+
 function send(ws, data) {
-  if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(data));
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(data));
 }
 
 function broadcast(room, data) {
- for (const client of room.clients) send(client, data);
+  for (const client of room.clients) send(client, data);
+}
+
+function connectedCount(room) {
+  return room.clients.filter(c => c.readyState === WebSocket.OPEN).length;
 }
 
 function publicState(room, playerIndex) {
   if (!room.state) return null;
   const state = JSON.parse(JSON.stringify(room.state));
   // Hide other players' actual cards in the data sent to each browser.
-  // Card counts remain visible through the placeholder array length.
   state.players.forEach((p, i) => {
     if (i !== playerIndex) {
       p.hand = (p.hand || []).map((card, n) => ({
@@ -51,6 +61,15 @@ function broadcastState(room) {
   }
 }
 
+function maybeStartNotification(room) {
+  if (connectedCount(room) !== PLAYER_COUNT) return;
+  // Do not send the start trigger again after a game has already begun.
+  if (room.state && room.state.gameStarted) return;
+  if (room.startNotificationSent) return;
+  room.startNotificationSent = true;
+  send(room.host, { type: 'room_full', gameAlreadyStarted: false });
+}
+
 function mergeClientState(room, incoming, senderIndex) {
   if (!room.state) {
     room.state = incoming;
@@ -59,9 +78,6 @@ function mergeClientState(room, incoming, senderIndex) {
 
   const old = room.state;
   const next = incoming;
-  const keep = (key) => old[key];
-
-  // Global game state is authoritative from the current game client.
   for (const key of [
     'deck','discardPile','indicator','indicatorAvailable','indicatorTaken',
     'roundStartingPlayer','universalRank','currentPlayer','hasDrawn','hasDiscarded',
@@ -71,17 +87,46 @@ function mergeClientState(room, incoming, senderIndex) {
     if (Object.prototype.hasOwnProperty.call(next, key)) old[key] = next[key];
   }
 
-  // Only the sender's hand is accepted. Melds are public and may be changed
-  // by the active player when extending another player's meld.
+  // Only the sender's hand is accepted. Melds are public and may be changed by a player.
   if (Array.isArray(old.players) && Array.isArray(next.players)) {
     if (next.players[senderIndex] && Array.isArray(next.players[senderIndex].hand)) {
       old.players[senderIndex].hand = next.players[senderIndex].hand;
     }
     next.players.forEach((p, i) => {
-      if (p && Array.isArray(p.melds)) old.players[i].melds = p.melds;
-      if (p && typeof p.name === 'string') old.players[i].name = p.name;
+      if (!old.players[i] || !p) return;
+      if (Array.isArray(p.melds)) old.players[i].melds = p.melds;
+      if (typeof p.name === 'string') old.players[i].name = p.name;
     });
   }
+}
+
+function attachPlayer(room, ws, seat, type) {
+  // Replace any stale connection for this exact seat.
+  const oldClient = room.clients.find(c => c.playerIndex === seat.playerIndex);
+  if (oldClient && oldClient !== ws) {
+    oldClient.room = null;
+    try { oldClient.close(); } catch {}
+    room.clients = room.clients.filter(c => c !== oldClient);
+  }
+  ws.room = room;
+  ws.playerIndex = seat.playerIndex;
+  ws.isHost = !!seat.isHost;
+  seat.client = ws;
+  seat.disconnectedAt = null;
+  if (ws.isHost) room.host = ws;
+  if (!room.clients.includes(ws)) room.clients.push(ws);
+
+  send(ws, {
+    type,
+    roomCode: room.code,
+    playerIndex: seat.playerIndex,
+    token: seat.token,
+    isHost: !!seat.isHost,
+    state: publicState(room, seat.playerIndex)
+  });
+  broadcast(room, { type: 'room_status', count: connectedCount(room) });
+  if (room.state) broadcastState(room);
+  maybeStartNotification(room);
 }
 
 const server = http.createServer((req, res) => {
@@ -113,34 +158,47 @@ wss.on('connection', ws => {
 
     if (msg.type === 'create_room') {
       const code = roomCode();
-      const room = { code, clients: [], state: null, host: ws };
+      const room = {
+        code,
+        clients: [],
+        state: null,
+        host: null,
+        seats: Array(PLAYER_COUNT).fill(null),
+        startNotificationSent: false,
+        cleanupTimer: null
+      };
       rooms.set(code, room);
-      ws.room = room;
-      ws.playerIndex = 0;
-      ws.isHost = true;
-      room.clients.push(ws);
-      send(ws, { type: 'room_created', roomCode: code, playerIndex: 0 });
-      send(ws, { type: 'room_status', count: 1 });
+      const seat = { playerIndex: 0, token: newToken(), isHost: true, client: null, disconnectedAt: null };
+      room.seats[0] = seat;
+      attachPlayer(room, ws, seat, 'room_created');
       return;
     }
 
     if (msg.type === 'join_room') {
       const code = String(msg.roomCode || '').toUpperCase();
       const room = rooms.get(code);
-      if (!room) return send(ws, { type: 'error', message: 'Room not found.' });
-      if (room.clients.length >= PLAYER_COUNT) return send(ws, { type: 'error', message: 'Room is full.' });
-      const used = new Set(room.clients.map(c => c.playerIndex));
-      let index = 0;
-      while (used.has(index)) index++;
-      ws.room = room;
-      ws.playerIndex = index;
-      room.clients.push(ws);
-      send(ws, { type: 'joined', roomCode: code, playerIndex: index });
-      broadcast(room, { type: 'room_status', count: room.clients.length });
-      if (room.clients.length === PLAYER_COUNT) {
-  send(room.host, { type: 'room_full' });
-}
-      if (room.state) broadcastState(room);
+      if (!room) return send(ws, { type: 'error', code: 'ROOM_NOT_FOUND', message: 'Room not found. The room may have expired or the server may have restarted.' });
+      const availableIndex = room.seats.findIndex(seat => !seat);
+      if (availableIndex < 0) return send(ws, { type: 'error', message: 'All player seats are reserved or occupied. Reconnect with the original device/session.' });
+      const seat = { playerIndex: availableIndex, token: newToken(), isHost: false, client: null, disconnectedAt: null };
+      room.seats[availableIndex] = seat;
+      attachPlayer(room, ws, seat, 'joined');
+      return;
+    }
+
+    if (msg.type === 'reconnect') {
+      const code = String(msg.roomCode || '').toUpperCase();
+      const room = rooms.get(code);
+      if (!room) return send(ws, { type: 'error', code: 'ROOM_NOT_FOUND', message: 'Room not found. The room may have expired or the server may have restarted.' });
+      const token = String(msg.token || '');
+      const seat = room.seats.find(s => s && s.token === token);
+      if (!seat) return send(ws, { type: 'error', code: 'RESUME_EXPIRED', message: 'Reconnect session expired. Please join with the room code if a seat is available.' });
+      if (seat.disconnectedAt && Date.now() - seat.disconnectedAt > RECONNECT_GRACE_MS) {
+        room.seats[seat.playerIndex] = null;
+        return send(ws, { type: 'error', code: 'RESUME_EXPIRED', message: 'Reconnect time expired. Please join again if a seat is available.' });
+      }
+      if (room.cleanupTimer) { clearTimeout(room.cleanupTimer); room.cleanupTimer = null; }
+      attachPlayer(room, ws, seat, 'reconnected');
       return;
     }
 
@@ -155,6 +213,7 @@ wss.on('connection', ws => {
       } else {
         mergeClientState(room, msg.state, ws.playerIndex);
       }
+      if (room.state && room.state.gameStarted) room.startNotificationSent = true;
       broadcastState(room);
       return;
     }
@@ -164,12 +223,33 @@ wss.on('connection', ws => {
     const room = ws.room;
     if (!room) return;
     room.clients = room.clients.filter(c => c !== ws);
-    if (room.clients.length === 0) {
-      rooms.delete(room.code);
-      return;
+    const seat = room.seats[ws.playerIndex];
+    if (seat && seat.client === ws) {
+      seat.client = null;
+      seat.disconnectedAt = Date.now();
     }
+    if (room.host === ws) room.host = null;
     broadcast(room, { type:'player_left', playerIndex: ws.playerIndex });
-    broadcast(room, { type:'room_status', count: room.clients.length });
+    broadcast(room, { type:'room_status', count: connectedCount(room) });
+
+    // Reserve the seat for a short reconnect window. If everyone disconnects,
+    // retain the room briefly instead of deleting the in-progress game instantly.
+    if (connectedCount(room) === 0) {
+      if (room.cleanupTimer) clearTimeout(room.cleanupTimer);
+      room.cleanupTimer = setTimeout(() => {
+        if (connectedCount(room) === 0) rooms.delete(room.code);
+      }, EMPTY_ROOM_GRACE_MS);
+    }
+
+    if (seat) {
+      setTimeout(() => {
+        const current = room.seats[ws.playerIndex];
+        if (current === seat && !seat.client && seat.disconnectedAt && Date.now() - seat.disconnectedAt >= RECONNECT_GRACE_MS) {
+          room.seats[ws.playerIndex] = null;
+          if (connectedCount(room) === 0 && room.seats.every(s => !s)) rooms.delete(room.code);
+        }
+      }, RECONNECT_GRACE_MS + 50);
+    }
   });
 });
 
