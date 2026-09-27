@@ -5154,7 +5154,19 @@ function applyOnlineState(st){
     if(!st || !Array.isArray(st.players) || st.players.length!==PLAYER_COUNT) return;
     suppressNetworkSync=true;
     try{
-        players=st.players; deck=st.deck||[]; discardPile=st.discardPile||[]; indicator=st.indicator||null;
+        players=st.players;
+
+        // JSON does not preserve custom properties attached to meld arrays.
+        // Rebuild each meld's sequence/set metadata after receiving online state,
+        // otherwise valid prefix extensions (for example 3♦ before 4♦) are rejected.
+        players.forEach(player => {
+            if (!player || !Array.isArray(player.melds)) return;
+            player.melds.forEach(meld => {
+                if (Array.isArray(meld)) storeMeldInfo(meld);
+            });
+        });
+
+        deck=st.deck||[]; discardPile=st.discardPile||[]; indicator=st.indicator||null;
         indicatorAvailable=!!st.indicatorAvailable; indicatorTaken=!!st.indicatorTaken; roundStartingPlayer=Number.isInteger(st.roundStartingPlayer)?st.roundStartingPlayer:0;
         universalRank=st.universalRank||null; currentPlayer=Number.isInteger(st.currentPlayer)?st.currentPlayer:0;
         hasDrawn=!!st.hasDrawn; hasDiscarded=!!st.hasDiscarded; turnMode=st.turnMode||null; turnActionMade=!!st.turnActionMade; turnMeldMade=!!st.turnMeldMade;
