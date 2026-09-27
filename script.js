@@ -2100,7 +2100,7 @@ function renderPlayers() {
             if (labelNode) {
                 // Display labels follow the user's marked seat numbering only.
                 // Seat positions and actual player/turn indexes remain unchanged.
-                const displayPlayerNumberBySeat = [null, 5, 2, 3, 4];
+                const displayPlayerNumberBySeat = [null, 5, 4, 3, 2];
                 labelNode.textContent =
                     seatOffset === 0
                         ? "You "
