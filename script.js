@@ -898,23 +898,22 @@ function newGame(resetMatch = true) {
     }
 
     /*
-       CLOCKWISE STARTER ROTATION
+       STARTING PLAYER ROTATION FOR THE 10-GAME MATCH
 
-       Game 1: You
-       Game 2: Player 5
-       Game 3: Player 4
-       Game 4: Player 3
-       Game 5: Player 2
-       Game 6: You
-       Game 7: Player 5
-       Game 8: Player 4
-       Game 9: Player 3
-       Game 10: Player 2
+       Game 1: Player 1
+       Game 2: Player 2
+       Game 3: Player 3
+       Game 4: Player 4
+       Game 5: Player 5
+       Game 6: Player 1
+       Game 7: Player 2
+       Game 8: Player 3
+       Game 9: Player 4
+       Game 10: Player 5
 
-       This follows the clockwise direction around the table
-       while giving every player exactly 2 starting games.
+       Every player starts exactly 2 games.
     */
-    const clockwiseOrder = [0, 4, 3, 2, 1];
+    const clockwiseOrder = [0, 1, 2, 3, 4];
     const startingPlayer =
         clockwiseOrder[roundScores.length % PLAYER_COUNT];
 
