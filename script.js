@@ -2079,9 +2079,16 @@ function renderPlayers() {
     */
     const localIndex = getLocalPlayerIndex();
 
+    // Visual seat order around the table:
+    // bottom (You), top-right, top-left, bottom-left, bottom-right.
+    // Clockwise numbering means the local player's left neighbor is +1,
+    // and the right neighbor is +4. Map actual players to those visual seats
+    // without changing the game's real player indexes or turn order.
+    const playerOffsetBySeat = [0, 3, 2, 1, 4];
+
     for (let seatOffset = 0; seatOffset < PLAYER_COUNT; seatOffset++) {
         const playerIndex =
-            (localIndex + seatOffset) % PLAYER_COUNT;
+            (localIndex + playerOffsetBySeat[seatOffset]) % PLAYER_COUNT;
         const player = players[playerIndex];
         const playerBox = $(`player${seatOffset + 1}`);
 
@@ -2098,13 +2105,12 @@ function renderPlayers() {
                 node => node.nodeType === Node.TEXT_NODE
             );
             if (labelNode) {
-                // Display labels follow the user's marked seat numbering only.
-                // Seat positions and actual player/turn indexes remain unchanged.
-                const displayPlayerNumberBySeat = [null, 5, 4, 3, 2];
+                // Show each real player's number from this client's view.
+                // The local player is always shown as "You".
                 labelNode.textContent =
                     seatOffset === 0
                         ? "You "
-                        : `Player ${displayPlayerNumberBySeat[seatOffset]} `;
+                        : `Player ${playerIndex + 1} `;
             }
         }
 
