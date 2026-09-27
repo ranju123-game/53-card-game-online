@@ -3605,7 +3605,7 @@ function completeTurn() {
 
     resetTurnState();
 
-    currentPlayer = (getLocalPlayerIndex() - 1 + PLAYER_COUNT) % PLAYER_COUNT;
+    currentPlayer = (getLocalPlayerIndex() + 1) % PLAYER_COUNT;
 
     updateMeldVisibility();
 
@@ -4877,7 +4877,7 @@ function finishAITurn(
     resetTurnState();
 
     currentPlayer =
-        (aiIndex - 1 + PLAYER_COUNT) %
+        (aiIndex + 1) %
         PLAYER_COUNT;
 
     updateMeldVisibility();
