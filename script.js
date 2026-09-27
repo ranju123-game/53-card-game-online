@@ -16,8 +16,8 @@ let onlineReconnectTimer = null;
 let onlineReconnectAttempts = 0;
 let onlineIntentionalClose = false;
 const ONLINE_SESSION_KEY = "cardGameOnlineSession_v1";
-function getSavedOnlineSession(){ try { return JSON.parse(localStorage.getItem(ONLINE_SESSION_KEY) || "null"); } catch { return null; } }
-function saveOnlineSession(){ try { localStorage.setItem(ONLINE_SESSION_KEY, JSON.stringify({ roomCode: onlineRoomCode, token: onlineReconnectToken, isHost: onlineHost })); } catch {} }
+function getSavedOnlineSession(){ try { return JSON.parse(sessionStorage.getItem(ONLINE_SESSION_KEY) || "null"); } catch { return null; } }
+function saveOnlineSession(){ try { sessionStorage.setItem(ONLINE_SESSION_KEY, JSON.stringify({ roomCode: onlineRoomCode, token: onlineReconnectToken, isHost: onlineHost })); } catch {} }
 let onlineReconnectToken = "";
 function getLocalPlayerIndex(){ return isOnlineGame ? myPlayerIndex : 0; }
 function isMyTurn(){ return currentPlayer === getLocalPlayerIndex(); }
@@ -5279,7 +5279,7 @@ function connectOnline(mode,room,automaticReconnect=false){
         if(m.type==="error"){
             onlineStatus(m.message||"Online error.");
             if(m.code==="RESUME_EXPIRED" || m.code==="ROOM_NOT_FOUND"){
-                try{localStorage.removeItem(ONLINE_SESSION_KEY);}catch{}
+                try{sessionStorage.removeItem(ONLINE_SESSION_KEY);}catch{}
                 onlineReconnectToken="";
             }
             return;
