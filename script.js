@@ -509,6 +509,8 @@ function finishGameByDrawExhaustion() {
     setMessage(
         `Game ${roundScores.length} ended after 2 suffols. No player finished. Scores recorded.`
     );
+
+    if (isOnlineGame) broadcastOnlineState();
 }
 
 function getTotalScores() {
@@ -3602,6 +3604,13 @@ function completeTurn() {
             true;
     }
 
+    // After the second suffol, let the current player finish their turn.
+    // If the draw pile is now empty, end the game before another turn starts.
+    if (suffolCount >= MAX_SUFFOLS && deck.length === 0) {
+        finishGameByDrawExhaustion();
+        if (isOnlineGame) broadcastOnlineState();
+        return;
+    }
 
     resetTurnState();
 
@@ -4873,6 +4882,11 @@ function finishAITurn(
             true;
     }
 
+    // End immediately after the final turn of the second suffol.
+    if (suffolCount >= MAX_SUFFOLS && deck.length === 0) {
+        finishGameByDrawExhaustion();
+        return;
+    }
 
     resetTurnState();
 
