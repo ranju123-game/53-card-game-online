@@ -2098,8 +2098,13 @@ function renderPlayers() {
                 node => node.nodeType === Node.TEXT_NODE
             );
             if (labelNode) {
+                // Display labels follow the user's marked seat numbering only.
+                // Seat positions and actual player/turn indexes remain unchanged.
+                const displayPlayerNumberBySeat = [null, 5, 2, 3, 4];
                 labelNode.textContent =
-                    seatOffset === 0 ? "You " : `${player.name} `;
+                    seatOffset === 0
+                        ? "You "
+                        : `Player ${displayPlayerNumberBySeat[seatOffset]} `;
             }
         }
 
