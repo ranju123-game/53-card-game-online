@@ -2161,13 +2161,46 @@ function renderPlayers() {
                     : (currentPlayer === playerIndex ? "● TURN" : "");
         }
 
-        // The local player's face-up hand is rendered separately in #hand.
-        if (seatOffset === 0) continue;
-
         const cardsBox = $(`p${seatOffset + 1}Cards`);
         if (!cardsBox) continue;
 
         cardsBox.innerHTML = "";
+
+        // During the seating draw, show each player's selected card face-up
+        // inside that player's own seat, including the local player's seat.
+        if (isOnlineGame && seatingPhase) {
+            const picked = seatingPicks.find(p => p.playerIndex === playerIndex);
+            if (picked && picked.card) {
+                const faceUpCard = document.createElement("div");
+                faceUpCard.className = cardClass(picked.card);
+                faceUpCard.setAttribute("aria-label", cardText(picked.card));
+                faceUpCard.title = `${player.name}: ${cardText(picked.card)}`;
+                faceUpCard.style.width = "48px";
+                faceUpCard.style.height = "68px";
+                faceUpCard.style.minWidth = "48px";
+                faceUpCard.style.display = "flex";
+                faceUpCard.style.alignItems = "center";
+                faceUpCard.style.justifyContent = "center";
+                faceUpCard.style.fontSize = "20px";
+                faceUpCard.style.fontWeight = "800";
+                faceUpCard.style.borderRadius = "6px";
+                faceUpCard.style.boxSizing = "border-box";
+                setCardVisual(faceUpCard, picked.card);
+                cardsBox.appendChild(faceUpCard);
+            } else {
+                const waiting = document.createElement("span");
+                waiting.textContent = "Choosing card…";
+                waiting.style.fontSize = "12px";
+                waiting.style.opacity = "0.8";
+                cardsBox.appendChild(waiting);
+            }
+            continue;
+        }
+
+        // In normal gameplay, the local player's face-up hand is rendered
+        // separately in #hand. Other players' hands remain face-down.
+        if (seatOffset === 0) continue;
+
         player.hand.forEach(() => {
             const back = document.createElement("div");
             back.className = "back-card";
