@@ -137,7 +137,7 @@ function mergeClientState(room, incoming, senderIndex) {
       'deck','discardPile','indicator','indicatorAvailable','indicatorTaken',
       'roundStartingPlayer','universalRank','currentPlayer','hasDrawn','hasDiscarded',
       'turnMode','turnActionMade','turnMeldMade','firstTurnCompleted','meldsRevealed',
-      'licensed','gameOver','gameWinner','gameStarted','lastRanking','roundScores','suffolCount','message'
+      'licensed','gameOver','gameWinner','gameStarted','lastRanking','roundScores','suffolCount','message','seatingPhase','seatingPicks','seatOrder','initialStarter','seatingComplete','seatingServer','seatingReady'
     ]) {
       if (Object.prototype.hasOwnProperty.call(next, key)) old[key] = next[key];
     }
@@ -231,6 +231,8 @@ wss.on('connection', ws => {
         host: null,
         seats: Array(PLAYER_COUNT).fill(null),
         startNotificationSent: false,
+        seatingDeck: null,
+        seatingPicks: [],
         cleanupTimer: null
       };
       rooms.set(code, room);
@@ -299,6 +301,54 @@ wss.on('connection', ws => {
       }
       if (room.cleanupTimer) { clearTimeout(room.cleanupTimer); room.cleanupTimer = null; }
       attachPlayer(room, ws, seat, 'reconnected');
+      return;
+    }
+
+    if (msg.type === 'seating_pick') {
+      const room = ws.room;
+      if (!room || !room.state || !room.state.seatingPhase) return;
+      if (room.seatingPicks.some(p => p.playerIndex === ws.playerIndex)) return;
+      if (!room.seatingDeck) {
+        const suits = ['♠', '♥', '♦', '♣'];
+        const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+        room.seatingDeck = [];
+        for (const suit of suits) for (const rank of ranks) room.seatingDeck.push({ rank, suit, id: `${rank}${suit}_seat` });
+        for (let i = room.seatingDeck.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [room.seatingDeck[i], room.seatingDeck[j]] = [room.seatingDeck[j], room.seatingDeck[i]];
+        }
+      }
+      if (!room.seatingDeck.length) return;
+      const requestedIndex = Number.isInteger(Number(msg.cardIndex)) ? Number(msg.cardIndex) : -1;
+      if (requestedIndex < 0 || requestedIndex >= room.seatingDeck.length) return;
+      const card = room.seatingDeck.splice(requestedIndex, 1)[0];
+      room.seatingPicks.push({ playerIndex: ws.playerIndex, card });
+      room.state.seatingPicks = room.seatingPicks.map(p => ({ playerIndex: p.playerIndex, card: p.card }));
+      if (room.seatingPicks.length === PLAYER_COUNT) {
+        const rankValue = card => ({ A: 1, J: 11, Q: 12, K: 13 }[card.rank] || Number(card.rank) || 0);
+        const highest = room.seatingPicks.reduce((best, p) => rankValue(p.card) > rankValue(best.card) ? p : best, room.seatingPicks[0]);
+        room.state.seatingServer = highest.playerIndex;
+        room.state.seatingReady = true;
+      }
+      broadcastState(room);
+      return;
+    }
+
+    if (msg.type === 'seating_deal') {
+      const room = ws.room;
+      if (!room || !room.state || !room.state.seatingPhase || !room.state.seatingReady || room.state.seatingComplete) return;
+      if (ws.playerIndex !== room.state.seatingServer || room.seatingPicks.length !== PLAYER_COUNT) return;
+      // The highest-card player shuffles and deals the five revealed cards.
+      const dealt = room.seatingPicks.slice();
+      for (let i = dealt.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [dealt[i], dealt[j]] = [dealt[j], dealt[i]];
+      }
+      room.state.seatOrder = dealt.map(p => p.playerIndex);
+      const highPos = room.state.seatOrder.indexOf(room.state.seatingServer);
+      room.state.initialStarter = room.state.seatOrder[(highPos + 1) % PLAYER_COUNT];
+      room.state.seatingComplete = true;
+      broadcastState(room);
       return;
     }
 
