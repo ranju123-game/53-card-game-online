@@ -348,6 +348,29 @@ wss.on('connection', ws => {
       const highPos = room.state.seatOrder.indexOf(room.state.seatingServer);
       room.state.initialStarter = room.state.seatOrder[(highPos + 1) % PLAYER_COUNT];
       room.state.seatingComplete = true;
+      // Pause after seating. The original game and 8-card hands start only
+      // after all five players press START.
+      room.state.seatingPhase = false;
+      room.state.waitingForStart = true;
+      room.state.gameStarted = false;
+      room.state.startReady = [false, false, false, false, false];
+      broadcastState(room);
+      return;
+    }
+
+    if (msg.type === 'player_start_ready') {
+      const room = ws.room;
+      if (!room || !room.state || !room.state.seatingComplete || !room.state.waitingForStart || room.state.gameStarted) return;
+      if (!Array.isArray(room.state.startReady) || room.state.startReady.length !== PLAYER_COUNT) {
+        room.state.startReady = [false, false, false, false, false];
+      }
+      room.state.startReady[ws.playerIndex] = true;
+      if (room.state.startReady.every(Boolean)) {
+        room.state.waitingForStart = false;
+        room.state.gameStarted = true;
+        room.state.message = 'All five players are ready. Game started.';
+        room.startNotificationSent = true;
+      }
       broadcastState(room);
       return;
     }
