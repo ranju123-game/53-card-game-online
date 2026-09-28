@@ -5267,6 +5267,13 @@ function renderSeatingPhase() {
     const myPick = seatingPicks.find(p => p.playerIndex === getLocalPlayerIndex());
     const allPicked = seatingPicks.length >= PLAYER_COUNT;
     let html = `<h2 style="margin:0 0 8px">Choose a card to decide seating</h2><p style="margin:0 0 12px">${seatingPicks.length}/5 players have chosen. Seating stays fixed for all 10 games.</p>`;
+    // Keep the local player's chosen card clearly visible in this panel before
+    // SHUFFLE & DEAL, even when all five players have already picked.
+    if (myPick && myPick.card) {
+        const pickedSuit = myPick.card.suit;
+        const pickedColor = pickedSuit === "♥" || pickedSuit === "♦" ? "#dc2626" : "#111827";
+        html += `<div style="display:flex;align-items:center;justify-content:center;gap:10px;margin:8px auto 14px;flex-wrap:wrap"><span style="font-weight:700">Your selected card:</span><div aria-label="Your selected card ${cardText(myPick.card)}" style="width:58px;height:82px;display:flex;align-items:center;justify-content:center;background:#fff;color:${pickedColor};border:2px solid #94a3b8;border-radius:8px;box-shadow:0 3px 8px #0002;font-size:24px;font-weight:900">${cardText(myPick.card)}</div></div>`;
+    }
     if (allPicked && !seatingComplete) {
         const dealerIndex = Number.isInteger(window.__seatingServerIndex) ? window.__seatingServerIndex : -1;
         const dealerPick = seatingPicks.find(p => p.playerIndex === dealerIndex);
