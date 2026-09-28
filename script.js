@@ -8,17 +8,11 @@ const HAND_SIZE = 8;
 let isOnlineGame = false;
 let myPlayerIndex = 0;
 let onlineRoomCode = "";
+let onlinePlayerName = "";
 let onlineSocket = null;
 let onlineHost = false;
 let suppressNetworkSync = false;
 let onlineForceFullState = false;
-let onlineReconnectTimer = null;
-let onlineReconnectAttempts = 0;
-let onlineIntentionalClose = false;
-const ONLINE_SESSION_KEY = "cardGameOnlineSession_v1";
-function getSavedOnlineSession(){ try { return JSON.parse(sessionStorage.getItem(ONLINE_SESSION_KEY) || "null"); } catch { return null; } }
-function saveOnlineSession(){ try { sessionStorage.setItem(ONLINE_SESSION_KEY, JSON.stringify({ roomCode: onlineRoomCode, token: onlineReconnectToken, isHost: onlineHost })); } catch {} }
-let onlineReconnectToken = "";
 function getLocalPlayerIndex(){ return isOnlineGame ? myPlayerIndex : 0; }
 function isMyTurn(){ return currentPlayer === getLocalPlayerIndex(); }
 
@@ -516,8 +510,6 @@ function finishGameByDrawExhaustion() {
     setMessage(
         `Game ${roundScores.length} ended after 2 suffols. No player finished. Scores recorded.`
     );
-
-    if (isOnlineGame) broadcastOnlineState();
 }
 
 function getTotalScores() {
@@ -905,22 +897,23 @@ function newGame(resetMatch = true) {
     }
 
     /*
-       STARTING PLAYER ROTATION FOR THE 10-GAME MATCH
+       CLOCKWISE STARTER ROTATION
 
-       Game 1: Player 1
-       Game 2: Player 2
-       Game 3: Player 3
-       Game 4: Player 4
-       Game 5: Player 5
-       Game 6: Player 1
-       Game 7: Player 2
-       Game 8: Player 3
-       Game 9: Player 4
-       Game 10: Player 5
+       Game 1: You
+       Game 2: Player 5
+       Game 3: Player 4
+       Game 4: Player 3
+       Game 5: Player 2
+       Game 6: You
+       Game 7: Player 5
+       Game 8: Player 4
+       Game 9: Player 3
+       Game 10: Player 2
 
-       Every player starts exactly 2 games.
+       This follows the clockwise direction around the table
+       while giving every player exactly 2 starting games.
     */
-    const clockwiseOrder = [0, 1, 2, 3, 4];
+    const clockwiseOrder = [0, 4, 3, 2, 1];
     const startingPlayer =
         clockwiseOrder[roundScores.length % PLAYER_COUNT];
 
@@ -947,6 +940,11 @@ function newGame(resetMatch = true) {
             hand: [],
             melds: []
         });
+    }
+
+    // In online play, use the name entered on the opening menu.
+    if (isOnlineGame && onlinePlayerName && players[myPlayerIndex]) {
+        players[myPlayerIndex].name = onlinePlayerName;
     }
 
     deck = shuffle(
@@ -1144,7 +1142,7 @@ function renderTableIndicator() {
 
     if (
         isMyTurn() &&
-        roundStartingPlayer === getLocalPlayerIndex() &&
+        roundStartingPlayer === 0 &&
         !indicatorTaken &&
         !firstTurnCompleted[getLocalPlayerIndex()] &&
         turnMode === null
@@ -1168,7 +1166,7 @@ function renderTableIndicator() {
 function takeIndicator() {
     if (gameOver) return;
     if (!isMyTurn()) return;
-    if (roundStartingPlayer !== getLocalPlayerIndex()) return;
+    if (roundStartingPlayer !== 0) return;
 
     if (
         firstTurnCompleted[getLocalPlayerIndex()]
@@ -2087,32 +2085,11 @@ function renderPlayers() {
     */
     const localIndex = getLocalPlayerIndex();
 
-    // The HTML seat IDs are positioned as follows:
-    // #player1 = bottom (You)
-    // #player2 = bottom-right (your right neighbor: previous player)
-    // #player3 = top-right
-    // #player4 = top-left
-    // #player5 = bottom-left (your left neighbor: next player)
-    //
-    // Therefore, when Player 1 is at the bottom:
-    // left = Player 2, then top-left = Player 3,
-    // top-right = Player 4, and right = Player 5.
-    // This only rotates which real player is displayed in each seat;
-    // it does NOT change player indexes or clockwise turn order.
-    const playerOffsetBySeatId = {
-        player1: 0,
-        player2: 4,
-        player3: 3,
-        player4: 2,
-        player5: 1
-    };
-
     for (let seatOffset = 0; seatOffset < PLAYER_COUNT; seatOffset++) {
-        const seatId = `player${seatOffset + 1}`;
         const playerIndex =
-            (localIndex + playerOffsetBySeatId[seatId]) % PLAYER_COUNT;
+            (localIndex + seatOffset) % PLAYER_COUNT;
         const player = players[playerIndex];
-        const playerBox = $(seatId);
+        const playerBox = $(`player${seatOffset + 1}`);
 
         if (!player || !playerBox) continue;
 
@@ -2127,12 +2104,10 @@ function renderPlayers() {
                 node => node.nodeType === Node.TEXT_NODE
             );
             if (labelNode) {
-                // Show each real player's number from this client's view.
-                // The local player is always shown as "You".
                 labelNode.textContent =
                     seatOffset === 0
-                        ? "You "
-                        : `Player ${playerIndex + 1} `;
+                        ? (isOnlineGame ? `${player.name} (You) ` : "You ")
+                        : `${player.name} `;
             }
         }
 
@@ -2348,11 +2323,17 @@ function isValidMeld(
                     normalCards[0].rank
             );
 
-        // A set is valid when all non-joker cards have the same rank.
-        // Do not require different suits: jokers and the game's set rule
-        // determine validity, not suit uniqueness.
+        const differentSuits =
+            new Set(
+                normalCards.map(
+                    card => card.suit
+                )
+            ).size ===
+            normalCards.length;
+
         if (
-            sameRank
+            sameRank &&
+            differentSuits
         ) {
             if (
                 normalCards.length <= 4
@@ -3604,17 +3585,10 @@ function completeTurn() {
             true;
     }
 
-    // After the second suffol, let the current player finish their turn.
-    // If the draw pile is now empty, end the game before another turn starts.
-    if (suffolCount >= MAX_SUFFOLS && deck.length === 0) {
-        finishGameByDrawExhaustion();
-        if (isOnlineGame) broadcastOnlineState();
-        return;
-    }
 
     resetTurnState();
 
-    currentPlayer = (getLocalPlayerIndex() + 1) % PLAYER_COUNT;
+    currentPlayer = (getLocalPlayerIndex() - 1 + PLAYER_COUNT) % PLAYER_COUNT;
 
     updateMeldVisibility();
 
@@ -4882,16 +4856,11 @@ function finishAITurn(
             true;
     }
 
-    // End immediately after the final turn of the second suffol.
-    if (suffolCount >= MAX_SUFFOLS && deck.length === 0) {
-        finishGameByDrawExhaustion();
-        return;
-    }
 
     resetTurnState();
 
     currentPlayer =
-        (aiIndex + 1) %
+        (aiIndex - 1 + PLAYER_COUNT) %
         PLAYER_COUNT;
 
     updateMeldVisibility();
@@ -5221,86 +5190,64 @@ function onlineStatus(t){const e=$("onlineStatus");if(e)e.textContent=t;}
 function showOnlinePanel(){
     const card=document.querySelector("#mainMenu .menu-card"); if(!card || $("onlinePanel")) return;
     const p=document.createElement("div"); p.id="onlinePanel"; p.style.marginTop="18px";
-    p.innerHTML='<div style="font-weight:800;margin-bottom:8px">ONLINE 5 PLAYER</div><button id="createOnlineBtn" class="menu-button menu-new-game" type="button">CREATE GAME</button><div style="display:flex;gap:8px;margin-top:12px"><input id="roomCodeInput" maxlength="6" placeholder="ROOM CODE" style="flex:1;padding:13px;border:1px solid #ccd2dc;border-radius:10px;text-align:center;text-transform:uppercase;font-weight:700"><button id="joinOnlineBtn" class="menu-button menu-resume" type="button" style="width:auto;margin:0;padding:0 18px">JOIN</button></div><div id="onlineStatus" style="min-height:22px;margin-top:12px;color:#687386;font-size:13px"></div>';
-    card.appendChild(p); $("createOnlineBtn").onclick=()=>connectOnline("create"); $("joinOnlineBtn").onclick=()=>connectOnline("join",$("roomCodeInput").value.trim().toUpperCase());
+    p.innerHTML='<div style="font-weight:800;margin-bottom:8px">ONLINE 5 PLAYER</div><button id="createOnlineBtn" class="menu-button menu-new-game" type="button">CREATE GAME</button><div style="display:flex;gap:8px;margin-top:12px"><input id="roomCodeInput" maxlength="6" placeholder="ROOM CODE" aria-label="Room code" style="flex:1;min-width:0;padding:13px;border:1px solid #ccd2dc;border-radius:10px;text-align:center;text-transform:uppercase;font-weight:700"><button id="joinOnlineBtn" class="menu-button menu-resume" type="button" style="width:auto;margin:0;padding:0 18px">JOIN</button></div><input id="playerNameInput" maxlength="24" placeholder="YOUR NAME" aria-label="Your player name" autocomplete="nickname" style="width:100%;box-sizing:border-box;padding:13px;margin-top:10px;border:1px solid #ccd2dc;border-radius:10px;text-align:center;font-weight:700"><div id="onlineStatus" role="status" style="min-height:22px;margin-top:12px;color:#687386;font-size:13px"></div>';
+    card.appendChild(p);
+    const nameInput = $("playerNameInput");
+    try {
+        if (nameInput) nameInput.value = localStorage.getItem("53CardGamePlayerName") || "";
+    } catch (_) {}
+    $("createOnlineBtn").onclick=()=>connectOnline("create");
+    $("joinOnlineBtn").onclick=()=>connectOnline("join",$("roomCodeInput").value.trim().toUpperCase());
 }
-function connectOnline(mode,room,automaticReconnect=false){
-    if(onlineReconnectTimer){clearTimeout(onlineReconnectTimer);onlineReconnectTimer=null;}
-    if(onlineSocket && onlineSocket.readyState===WebSocket.OPEN){
-        onlineIntentionalClose=true;
-        onlineSocket.close();
+function connectOnline(mode,room){
+    const nameInput = $("playerNameInput");
+    const enteredName = nameInput ? nameInput.value.trim().replace(/\\s+/g, " ").slice(0, 24) : "";
+
+    if (!enteredName) {
+        onlineStatus("Please enter your name first.");
+        if (nameInput) nameInput.focus();
+        return;
     }
-    const saved=getSavedOnlineSession();
-    const requestedRoom=String(room||"").trim().toUpperCase();
-    const canResume=mode==="join" && saved && saved.token && saved.roomCode===requestedRoom;
-    const useResume=automaticReconnect || canResume;
-    if(useResume && saved){onlineRoomCode=saved.roomCode;onlineReconnectToken=saved.token;onlineHost=!!saved.isHost;}
-    else if(!automaticReconnect){onlineRoomCode="";onlineReconnectToken="";onlineHost=mode==="create";}
-    onlineIntentionalClose=false;
-    isOnlineGame=true;
-    onlineStatus(useResume?"Reconnecting to your game...":(mode==="create"?"Creating room...":"Joining room..."));
-    const proto=location.protocol==="https:"?"wss:":"ws:";
-    const socket=new WebSocket(proto+"//"+location.host);
-    onlineSocket=socket;
-    socket.onopen=()=>{
-        if(onlineSocket!==socket)return;
-        if(useResume && onlineRoomCode && onlineReconnectToken){
-            socket.send(JSON.stringify({type:"reconnect",roomCode:onlineRoomCode,token:onlineReconnectToken}));
-        }else{
-            socket.send(JSON.stringify({type:mode==="create"?"create_room":"join_room",roomCode:requestedRoom||""}));
-        }
-    };
-    socket.onmessage=e=>{if(onlineSocket!==socket)return;let m;try{m=JSON.parse(e.data)}catch{return;}
-        if(m.type==="room_created"||m.type==="joined"||m.type==="reconnected"){
-            onlineRoomCode=m.roomCode;myPlayerIndex=m.playerIndex;
-            if(m.token)onlineReconnectToken=m.token;
-            if(typeof m.isHost==="boolean")onlineHost=m.isHost;
-            saveOnlineSession();
-            onlineReconnectAttempts=0;
-            onlineStatus(`Room ${onlineRoomCode} • You are Player ${myPlayerIndex+1}. ${m.state?"Game resumed.":"Waiting for 5 players..."}`);
-            if(m.state){applyOnlineState(m.state);const menu=$("mainMenu"),game=$("gameScreen");if(menu)menu.style.display="none";if(game)game.style.display="block";}
-            return;
-        }
+
+    if (mode === "join" && !room) {
+        onlineStatus("Please enter the room code.");
+        const roomInput = $("roomCodeInput");
+        if (roomInput) roomInput.focus();
+        return;
+    }
+
+    onlinePlayerName = enteredName;
+    try {
+        localStorage.setItem("53CardGamePlayerName", onlinePlayerName);
+    } catch (_) {}
+
+    if(onlineSocket && onlineSocket.readyState===WebSocket.OPEN) onlineSocket.close();
+    isOnlineGame=true; onlineHost=mode==="create"; onlineStatus(mode==="create"?"Creating room...":"Joining room...");
+    const proto=location.protocol==="https:"?"wss:":"ws:"; onlineSocket=new WebSocket(proto+"//"+location.host);
+    onlineSocket.onopen=()=>onlineSocket.send(JSON.stringify({type:mode==="create"?"create_room":"join_room",roomCode:room||"",playerName:onlinePlayerName}));
+    onlineSocket.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch{return}
+        if(m.type==="room_created"||m.type==="joined"){onlineRoomCode=m.roomCode;myPlayerIndex=m.playerIndex;onlineStatus(`Room ${onlineRoomCode} • You are Player ${myPlayerIndex+1}. Waiting for 5 players...`);return;}
         if(m.type==="room_status"){onlineStatus(`Room ${onlineRoomCode} • ${m.count}/5 players connected.`);return;}
-        // A room becoming full starts only a brand-new game, never a resumed game.
-        if(m.type==="room_full"&&onlineHost){
-            if(!gameStarted && !m.gameAlreadyStarted){onlineStatus(`Room ${onlineRoomCode} is full. Starting game...`);newGame(true);}
-            return;
-        }
+        if(m.type==="room_full"&&onlineHost){onlineStatus(`Room ${onlineRoomCode} is full. Starting game...`);newGame(true);return;}
         if(m.type==="state"){
-            applyOnlineState(m.state);const menu=$("mainMenu"),game=$("gameScreen");if(menu)menu.style.display="none";if(game)game.style.display="block";return;
-        }
-        if(m.type==="error"){
-            if(m.code==="RESUME_EXPIRED"){
-                // If the saved reconnect token is no longer accepted, retry with
-                // the room code. The server can reclaim this tab's disconnected seat.
-                try{sessionStorage.removeItem(ONLINE_SESSION_KEY);}catch{}
-                onlineReconnectToken="";
-                if(onlineRoomCode && socket.readyState===WebSocket.OPEN){
-                    onlineStatus("Reconnecting with room code...");
-                    socket.send(JSON.stringify({type:"join_room",roomCode:onlineRoomCode,resumeFallback:true}));
-                    return;
-                }
+            applyOnlineState(m.state);
+            // Publish this browser's chosen name once the shared game state arrives.
+            // The server merges player names from clients into the shared state.
+            if (isOnlineGame && onlinePlayerName && players[myPlayerIndex] &&
+                players[myPlayerIndex].name !== onlinePlayerName) {
+                players[myPlayerIndex].name = onlinePlayerName;
+                render();
+                broadcastOnlineState();
             }
-            if(m.code==="ROOM_NOT_FOUND"){
-                try{sessionStorage.removeItem(ONLINE_SESSION_KEY);}catch{}
-                onlineReconnectToken="";
-            }
-            onlineStatus(m.message||"Online error.");
+            const menu=$("mainMenu"),game=$("gameScreen");
+            if(menu)menu.style.display="none";
+            if(game)game.style.display="block";
             return;
         }
+        if(m.type==="error") onlineStatus(m.message||"Online error.");
         if(m.type==="player_left") onlineStatus(`Player ${m.playerIndex+1} disconnected. Waiting for reconnection...`);
     };
-    socket.onclose=()=>{
-        if(onlineSocket!==socket || onlineIntentionalClose)return;
-        if(isOnlineGame && onlineRoomCode && onlineReconnectToken){
-            onlineStatus("Connection lost. Reconnecting automatically...");
-            if(onlineReconnectTimer)clearTimeout(onlineReconnectTimer);
-            onlineReconnectAttempts++;
-            onlineReconnectTimer=setTimeout(()=>connectOnline("join",onlineRoomCode,true),Math.min(1000+onlineReconnectAttempts*1000,5000));
-        }else if(isOnlineGame)onlineStatus("Connection closed. Rejoin using your room code.");
-    };
-    socket.onerror=()=>{if(onlineSocket===socket)onlineStatus("Connection problem. Trying to reconnect...");};
+    onlineSocket.onclose=()=>{if(isOnlineGame)onlineStatus("Connection closed.");}; onlineSocket.onerror=()=>onlineStatus("Could not connect to multiplayer server.");
 }
 
 document.addEventListener(
