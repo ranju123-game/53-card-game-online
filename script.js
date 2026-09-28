@@ -2142,7 +2142,9 @@ function renderPlayers() {
 
         // Record which real player occupies this visual seat. Meld rendering
         // uses this same mapping so each player's meld stays in their own box.
-        playerBox.dataset.playerIndex = String(playerIndex);
+        if (playerBox.dataset.playerIndex !== String(playerIndex)) {
+            playerBox.dataset.playerIndex = String(playerIndex);
+        }
 
         // Keep the local player in the bottom seat and label others by name.
         const heading = playerBox.querySelector("h2");
@@ -2158,30 +2160,55 @@ function renderPlayers() {
 
                 // Online seats show names only (no Player 1/2/3/4/5 labels).
                 // The visual seats still follow the existing clockwise mapping.
-                labelNode.textContent =
-                    isOnlineGame
-                        ? `${displayName} `
-                        : (seatOffset === 0 ? "You " : `${player.name} `);
+                const nextLabel = isOnlineGame
+                    ? `${displayName} `
+                    : (seatOffset === 0 ? "You " : `${player.name} `);
+
+                // Avoid rewriting the same label on every network update;
+                // repeated text writes can trigger visible layout jitter.
+                if (labelNode.textContent !== nextLabel) {
+                    labelNode.textContent = nextLabel;
+                }
             }
         }
 
         const status = playerBox.querySelector(".status");
         if (status) {
-            status.textContent =
-                seatOffset === 0
-                    ? (isMyTurn() ? "● YOUR TURN" : "")
-                    : (currentPlayer === playerIndex ? "● TURN" : "");
+            const nextStatus = seatOffset === 0
+                ? (isMyTurn() ? "● YOUR TURN" : "")
+                : (currentPlayer === playerIndex ? "● TURN" : "");
+            if (status.textContent !== nextStatus) {
+                status.textContent = nextStatus;
+            }
         }
 
         const cardsBox = $(`p${seatOffset + 1}Cards`);
         if (!cardsBox) continue;
 
+        // Only rebuild a seat's card display when its visible content changes.
+        // The server sends frequent state updates; clearing and recreating the
+        // same card backs on every update makes the player panels/name labels
+        // appear to shake.
+        const isSeatingView = isOnlineGame && seatingPhase;
+        const pickedForSeat = isSeatingView
+            ? seatingPicks.find(p => p.playerIndex === playerIndex)
+            : null;
+        const cardDisplaySignature = isSeatingView
+            ? (pickedForSeat && pickedForSeat.card
+                ? `seating:${cardText(pickedForSeat.card)}`
+                : "seating:waiting")
+            : (seatOffset === 0 ? "local-hand-separate" : `backs:${player.hand.length}`);
+
+        if (cardsBox.dataset.renderSignature === cardDisplaySignature) {
+            continue;
+        }
         cardsBox.innerHTML = "";
+        cardsBox.dataset.renderSignature = cardDisplaySignature;
 
         // During the seating draw, show each player's selected card face-up
         // inside that player's own seat, including the local player's seat.
-        if (isOnlineGame && seatingPhase) {
-            const picked = seatingPicks.find(p => p.playerIndex === playerIndex);
+        if (isSeatingView) {
+            const picked = pickedForSeat;
             if (picked && picked.card) {
                 const faceUpCard = document.createElement("div");
                 faceUpCard.className = cardClass(picked.card);
