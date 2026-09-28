@@ -26,7 +26,7 @@ function clockwisePreviousPlayer(playerIndex) {
     const pos = order.indexOf(playerIndex);
     return order[(pos < 0 ? 0 : pos - 1 + PLAYER_COUNT) % PLAYER_COUNT];
 }
-function isMyTurn(){ return currentPlayer === getLocalPlayerIndex(); }
+function isMyTurn(){ return gameStarted && !waitingForStart && currentPlayer === getLocalPlayerIndex(); }
 
 
 let players = [];
@@ -94,6 +94,8 @@ let licensed = [
 let gameOver = false;
 let gameWinner = -1;
 let gameStarted = false;
+let waitingForStart = false;
+let startReady = [false, false, false, false, false];
 let seatingPhase = false;
 let seatingPicks = [];
 let seatingComplete = false;
@@ -916,9 +918,11 @@ function updateMeldVisibility() {
    NEW GAME
 ========================================================= */
 
-function newGame(resetMatch = true) {
+function newGame(resetMatch = true, waitForPlayers = false) {
     if (isOnlineGame && onlineHost) onlineForceFullState = true;
-    gameStarted = true;
+    waitingForStart = !!(isOnlineGame && waitForPlayers);
+    startReady = [false, false, false, false, false];
+    gameStarted = !waitingForStart;
 
     if (resetMatch) {
         roundScores = [];
@@ -1129,6 +1133,7 @@ function render() {
     renderHand();
     renderMelds();
     renderSeatingPhase();
+    renderStartReadyPanel();
 
     updateButtons();
     updateCompleteButton();
@@ -5309,6 +5314,64 @@ function renderSeatingPhase() {
 }
 
 /* =========================================================
+   POST-DEAL READY GATE
+   Each player reviews their hand and fixed seating, then presses START.
+   The server starts the game only after all five players are ready.
+========================================================= */
+function renderStartReadyPanel() {
+    let panel = $('startReadyPanel');
+    if (!isOnlineGame || !waitingForStart || gameStarted) {
+        if (panel) panel.remove();
+        return;
+    }
+    if (!panel) {
+        panel = document.createElement('div');
+        panel.id = 'startReadyPanel';
+        panel.style.cssText = 'position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;padding:18px;box-sizing:border-box;background:rgba(0,0,0,.62);';
+        document.body.appendChild(panel);
+    }
+    const readyList = Array.isArray(startReady) ? startReady : [false,false,false,false,false];
+    const readyCount = readyList.filter(Boolean).length;
+    const order = Array.isArray(seatOrder) && seatOrder.length === PLAYER_COUNT ? seatOrder : [0,4,3,2,1];
+    const sequence = order.map(i => {
+        const player = players[i];
+        const pick = seatingPicks.find(p => p.playerIndex === i);
+        const name = player && player.name && !/^Player \d+$/.test(player.name) ? player.name : `Player ${i + 1}`;
+        return `${name}${pick && pick.card ? ` (${cardText(pick.card)})` : ''}`;
+    });
+    const localIndex = getLocalPlayerIndex();
+    const localReady = !!readyList[localIndex];
+    const localPick = seatingPicks.find(p => p.playerIndex === localIndex);
+    const localSeatPosition = order.indexOf(localIndex);
+    const localName = players[localIndex]?.name || onlinePlayerName || `Player ${localIndex + 1}`;
+    panel.innerHTML = `<div role="dialog" aria-modal="true" aria-labelledby="startReadyTitle" style="width:min(620px,100%);max-height:90vh;overflow:auto;background:#fff;color:#111827;border-radius:18px;padding:24px;box-sizing:border-box;text-align:center;box-shadow:0 18px 60px #0006;">
+      <h2 id="startReadyTitle" style="margin:0 0 10px;font-size:25px">Seating Set — Confirm Your Position</h2>
+      <p style="margin:0 0 14px;line-height:1.5">No game cards have been dealt yet. Check the single card you selected for seating and your position. The original game starts only after all five players press START.</p>
+      <div style="margin:0 auto 16px;padding:14px;border-radius:12px;background:#f1f5f9;text-align:center">
+        <div style="font-weight:800;margin-bottom:8px">Your seating card</div>
+        <div style="display:inline-flex;align-items:center;justify-content:center;min-width:74px;min-height:94px;padding:8px;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:10px;background:#fff;color:${localPick && ['♥','♦'].includes(localPick.card?.suit) ? '#dc2626' : '#111827'};font-size:25px;font-weight:900;box-shadow:0 2px 6px #0002">${localPick && localPick.card ? cardText(localPick.card) : '—'}</div>
+        <div style="margin-top:8px;font-weight:700">${localName} — Seat ${localSeatPosition >= 0 ? localSeatPosition + 1 : '—'}</div>
+      </div>
+      <div style="margin:0 auto 16px;padding:12px;border-radius:12px;background:#f1f5f9;text-align:left">
+        <strong>Clockwise seating order:</strong>
+        <div style="margin-top:8px;line-height:1.8">${sequence.join(' &nbsp; → &nbsp; ')}</div>
+        <div style="margin-top:8px;font-size:13px;color:#475569">Game 1 starts with ${players[initialStarter]?.name || 'the designated starting player'}. Seating stays fixed for all 10 games.</div>
+      </div>
+      <p style="margin:0 0 14px;font-weight:700">Players ready: ${readyCount}/5</p>
+      <button id="confirmStartBtn" type="button" ${localReady ? 'disabled' : ''} style="padding:13px 34px;border:0;border-radius:10px;background:${localReady ? '#94a3b8' : '#2563eb'};color:#fff;font-size:17px;font-weight:900;cursor:${localReady ? 'default' : 'pointer'}">${localReady ? 'WAITING FOR OTHERS…' : 'START'}</button>
+      <p style="margin:12px 0 0;font-size:13px;color:#64748b">${readyCount === 5 ? 'Everyone is ready. Starting…' : 'Your game will not start until everyone is ready.'}</p>
+    </div>`;
+    const button = $('confirmStartBtn');
+    if (button) button.addEventListener('click', () => {
+        if (readyList[getLocalPlayerIndex()] || !onlineSocket || onlineSocket.readyState !== WebSocket.OPEN) return;
+        button.disabled = true;
+        button.textContent = 'WAITING FOR OTHERS…';
+        button.style.background = '#94a3b8';
+        onlineSocket.send(JSON.stringify({ type: 'player_start_ready', roomCode: onlineRoomCode }));
+    });
+}
+
+/* =========================================================
    ONLINE MULTIPLAYER
 ========================================================= */
 function broadcastOnlineState(){
@@ -5316,7 +5379,7 @@ function broadcastOnlineState(){
     const forceFull = onlineForceFullState && onlineHost;
     onlineSocket.send(JSON.stringify({type:"state",roomCode:onlineRoomCode,forceFull,state:{
         players,deck,discardPile,indicator,indicatorAvailable,indicatorTaken,roundStartingPlayer,universalRank,currentPlayer,
-        seatingPhase,seatingPicks,seatingComplete,seatOrder,initialStarter,
+        seatingPhase,seatingPicks,seatingComplete,seatOrder,initialStarter,waitingForStart,startReady,
         selectedCards:[],hasDrawn,hasDiscarded,turnMode,turnActionMade,turnMeldMade,firstTurnCompleted,meldsRevealed,licensed,
         gameOver,gameWinner,gameStarted,lastRanking,roundScores,suffolCount,message:$('message')?$('message').textContent:""
     }}));
@@ -5346,6 +5409,7 @@ function applyOnlineState(st){
         meldsRevealed=Array.isArray(st.meldsRevealed)?st.meldsRevealed:[false,false,false,false,false];
         licensed=Array.isArray(st.licensed)?st.licensed:[false,false,false,false,false]; gameOver=!!st.gameOver; gameWinner=Number.isInteger(st.gameWinner)?st.gameWinner:-1;
         seatingPhase=!!st.seatingPhase; seatingPicks=Array.isArray(st.seatingPicks)?st.seatingPicks:[]; seatingComplete=!!st.seatingComplete; window.__seatingServerIndex = Number.isInteger(st.seatingServer) ? st.seatingServer : -1; seatOrder=Array.isArray(st.seatOrder)&&st.seatOrder.length===PLAYER_COUNT?st.seatOrder:[0,4,3,2,1]; initialStarter=Number.isInteger(st.initialStarter)?st.initialStarter:0;
+        waitingForStart=!!st.waitingForStart; startReady=Array.isArray(st.startReady)?st.startReady:[false,false,false,false,false];
         gameStarted=!!st.gameStarted; lastRanking=Array.isArray(st.lastRanking)?st.lastRanking:[]; roundScores=Array.isArray(st.roundScores)?st.roundScores:[]; suffolCount=Number.isInteger(st.suffolCount)?st.suffolCount:0; selectedCards=[];
         render(); if(st.message) setMessage(st.message);
         if(gameOver && lastRanking.length) showRoundScoreboard(lastRanking);
@@ -5404,9 +5468,12 @@ function connectOnline(mode,room){
                 render();
                 broadcastOnlineState();
             }
-            if (onlineHost && seatingPhase && seatingComplete && !gameStarted) {
-                onlineStatus(`Seating decided for all 10 games. Starting Game 1...`);
-                newGame(true);
+            // The seating deal only fixes the seats. Do not deal the real 8-card
+            // hands until all five players have confirmed START.
+            if (onlineHost && seatingComplete && gameStarted &&
+                players.length === PLAYER_COUNT && players.every(p => !Array.isArray(p.hand) || p.hand.length === 0)) {
+                onlineStatus(`All five players are ready. Starting Game 1...`);
+                newGame(true, false);
             }
             const menu=$("mainMenu"),game=$("gameScreen");
             if(menu)menu.style.display="none";
