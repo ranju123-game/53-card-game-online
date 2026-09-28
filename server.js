@@ -8,8 +8,8 @@ const PORT = process.env.PORT || 3000;
 const ROOT = __dirname;
 const rooms = new Map();
 const PLAYER_COUNT = 5;
-const RECONNECT_GRACE_MS = 5 * 60 * 1000;
-const EMPTY_ROOM_GRACE_MS = 10 * 60 * 1000;
+const RECONNECT_GRACE_MS = 24 * 60 * 60 * 1000; // Keep player seats resumable for 24 hours.
+const EMPTY_ROOM_GRACE_MS = 24 * 60 * 60 * 1000; // Keep an empty room and its game state for 24 hours.
 
 function roomCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -244,10 +244,43 @@ wss.on('connection', ws => {
       const code = String(msg.roomCode || '').toUpperCase();
       const room = rooms.get(code);
       if (!room) return send(ws, { type: 'error', code: 'ROOM_NOT_FOUND', message: 'Room not found. The room may have expired or the server may have restarted.' });
-      const availableIndex = room.seats.findIndex(seat => !seat);
-      if (availableIndex < 0) return send(ws, { type: 'error', message: 'All player seats are reserved or occupied. Reconnect with the original device/session.' });
-      const seat = { playerIndex: availableIndex, token: newToken(), isHost: false, client: null, disconnectedAt: null };
-      room.seats[availableIndex] = seat;
+      // Prefer a never-used seat. If all seats are reserved, allow the room-code
+      // holder to reclaim a DISCONNECTED seat so a refreshed/reopened tab can
+      // resume the existing game without its old session token. Never take a
+      // seat away from a player who is still connected.
+      let availableIndex = -1;
+      let reclaimingDisconnectedSeat = false;
+
+      // A reconnect-token fallback should reclaim an existing disconnected seat
+      // before using a never-used seat, preserving the player's game identity.
+      if (msg.resumeFallback) {
+        availableIndex = room.seats.findIndex(seat => seat && !seat.client);
+        reclaimingDisconnectedSeat = availableIndex >= 0;
+      }
+
+      if (availableIndex < 0) {
+        availableIndex = room.seats.findIndex(seat => !seat);
+      }
+
+      if (availableIndex < 0 && !reclaimingDisconnectedSeat) {
+        availableIndex = room.seats.findIndex(seat => seat && !seat.client);
+        reclaimingDisconnectedSeat = availableIndex >= 0;
+      }
+
+      if (availableIndex < 0) {
+        return send(ws, { type: 'error', message: 'All player seats are currently connected. Use the original room session to reconnect.' });
+      }
+
+      let seat;
+      if (reclaimingDisconnectedSeat) {
+        seat = room.seats[availableIndex];
+        // Rotate the token so an old browser session cannot replace this new connection.
+        seat.token = newToken();
+      } else {
+        seat = { playerIndex: availableIndex, token: newToken(), isHost: false, client: null, disconnectedAt: null };
+        room.seats[availableIndex] = seat;
+      }
+
       attachPlayer(room, ws, seat, 'joined');
       return;
     }
@@ -260,8 +293,9 @@ wss.on('connection', ws => {
       const seat = room.seats.find(s => s && s.token === token);
       if (!seat) return send(ws, { type: 'error', code: 'RESUME_EXPIRED', message: 'Reconnect session expired. Please join with the room code if a seat is available.' });
       if (seat.disconnectedAt && Date.now() - seat.disconnectedAt > RECONNECT_GRACE_MS) {
-        room.seats[seat.playerIndex] = null;
-        return send(ws, { type: 'error', code: 'RESUME_EXPIRED', message: 'Reconnect time expired. Please join again if a seat is available.' });
+        // Keep the seat reserved in the room. The player can still use the room
+        // code to reclaim this disconnected seat through join_room.
+        return send(ws, { type: 'error', code: 'RESUME_EXPIRED', message: 'Reconnect token expired. Rejoining with the room code...' });
       }
       if (room.cleanupTimer) { clearTimeout(room.cleanupTimer); room.cleanupTimer = null; }
       attachPlayer(room, ws, seat, 'reconnected');
