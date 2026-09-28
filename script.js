@@ -5395,6 +5395,16 @@ function broadcastOnlineState(){
 function applyOnlineState(st){
     if(!st || !Array.isArray(st.players) || st.players.length!==PLAYER_COUNT) return;
 
+    // Once the round scoreboard is open, other players may keep sending
+    // snapshots. Do not redraw the table or recreate the scoreboard for those
+    // updates: rebuilding the cards and player seats behind the overlay causes
+    // visible shaking. The next-game action will clear gameOver and normal
+    // state rendering will resume.
+    if (gameOver && st.gameOver && $("gameOverPanel")) {
+        if (st.message) setMessage(st.message);
+        return;
+    }
+
     // Repeated identical WebSocket snapshots used to rebuild every card and
     // player panel, causing visible flicker/jitter around the table. Ignore
     // unchanged board state; message text can update without rebuilding the UI.
