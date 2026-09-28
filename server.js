@@ -70,18 +70,66 @@ function maybeStartNotification(room) {
   send(room.host, { type: 'room_full', gameAlreadyStarted: false });
 }
 
-function mergeClientState(room, incoming, senderIndex) {
-  if (!room.state) {
-    room.state = incoming;
-    return;
+// Validate that each physical card exists in only one live location.
+// The indicator is a live card only while it is still available on the table;
+// after it is taken, its metadata may remain in `indicator` but the card itself
+// must be counted in the player's hand, discard pile, or meld instead.
+function hasDuplicateCards(state) {
+  if (!state || !Array.isArray(state.players) || !Array.isArray(state.deck) || !Array.isArray(state.discardPile)) {
+    return true;
   }
 
-  const old = room.state;
+  const seen = new Set();
+  const addCard = card => {
+    if (!card || !card.rank || card.rank === 'HIDDEN') return true;
+    const key = card.rank === 'JOKER'
+      ? 'JOKER'
+      : `${String(card.rank)}|${String(card.suit)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  };
+
+  for (const card of state.deck) {
+    if (!addCard(card)) return true;
+  }
+
+  for (const player of state.players) {
+    if (!player) continue;
+    for (const card of (Array.isArray(player.hand) ? player.hand : [])) {
+      if (!addCard(card)) return true;
+    }
+    for (const meld of (Array.isArray(player.melds) ? player.melds : [])) {
+      if (!Array.isArray(meld)) continue;
+      for (const card of meld) {
+        if (!addCard(card)) return true;
+      }
+    }
+  }
+
+  for (const card of state.discardPile) {
+    if (!addCard(card)) return true;
+  }
+
+  if (state.indicatorAvailable && state.indicator && !addCard(state.indicator)) {
+    return true;
+  }
+
+  return false;
+}
+
+function mergeClientState(room, incoming, senderIndex) {
+  if (!room.state) {
+    if (!hasDuplicateCards(incoming)) room.state = incoming;
+    return !hasDuplicateCards(incoming);
+  }
+
+  // Work on a copy so a rejected snapshot cannot partially corrupt room.state.
+  const old = JSON.parse(JSON.stringify(room.state));
   const next = incoming;
 
   // Only the player whose turn it currently is may update shared game state.
-  // This prevents an out-of-date snapshot from another browser from restoring
-  // cards to the draw pile (which could make the same card appear twice).
+  // This blocks stale snapshots from restoring cards to the draw pile.
   const isActivePlayer = Number(senderIndex) === Number(old.currentPlayer);
 
   if (isActivePlayer) {
@@ -96,22 +144,26 @@ function mergeClientState(room, incoming, senderIndex) {
   }
 
   if (Array.isArray(old.players) && Array.isArray(next.players)) {
-    // Hand and meld changes are accepted only from the active player. A player
-    // can still update their display name while it is someone else's turn.
+    // Only the active player may update a hand or melds. Names may be updated
+    // by any connected player.
     if (isActivePlayer && next.players[senderIndex] && Array.isArray(next.players[senderIndex].hand)) {
       old.players[senderIndex].hand = next.players[senderIndex].hand;
     }
     if (isActivePlayer) {
-      next.players.forEach((p, i) => {
-        if (!old.players[i] || !p) return;
-        if (Array.isArray(p.melds)) old.players[i].melds = p.melds;
+      next.players.forEach((player, i) => {
+        if (!old.players[i] || !player) return;
+        if (Array.isArray(player.melds)) old.players[i].melds = player.melds;
       });
     }
-    next.players.forEach((p, i) => {
-      if (!old.players[i] || !p) return;
-      if (typeof p.name === 'string') old.players[i].name = p.name;
+    next.players.forEach((player, i) => {
+      if (!old.players[i] || !player) return;
+      if (typeof player.name === 'string') old.players[i].name = player.name;
     });
   }
+
+  if (hasDuplicateCards(old)) return false;
+  room.state = old;
+  return true;
 }
 
 function attachPlayer(room, ws, seat, type) {
@@ -219,13 +271,21 @@ wss.on('connection', ws => {
     if (msg.type === 'state') {
       const room = ws.room;
       if (!room || !msg.state) return;
+      let accepted = true;
       if (!room.state) {
         if (!ws.isHost) return send(ws, { type:'error', message:'Waiting for the room creator to start the game.' });
-        room.state = msg.state;
+        if (hasDuplicateCards(msg.state)) accepted = false;
+        else room.state = msg.state;
       } else if (msg.forceFull && ws.isHost) {
-        room.state = msg.state;
+        if (hasDuplicateCards(msg.state)) accepted = false;
+        else room.state = msg.state;
       } else {
-        mergeClientState(room, msg.state, ws.playerIndex);
+        accepted = mergeClientState(room, msg.state, ws.playerIndex);
+      }
+      if (!accepted) {
+        send(ws, { type:'error', code:'DUPLICATE_CARD_STATE', message:'Update rejected: the same card appeared in more than one place. The last valid game state was restored.' });
+        broadcastState(room);
+        return;
       }
       if (room.state && room.state.gameStarted) room.startNotificationSent = true;
       broadcastState(room);
