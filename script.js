@@ -5271,11 +5271,22 @@ function connectOnline(mode,room,automaticReconnect=false){
             applyOnlineState(m.state);const menu=$("mainMenu"),game=$("gameScreen");if(menu)menu.style.display="none";if(game)game.style.display="block";return;
         }
         if(m.type==="error"){
-            onlineStatus(m.message||"Online error.");
-            if(m.code==="RESUME_EXPIRED" || m.code==="ROOM_NOT_FOUND"){
+            if(m.code==="RESUME_EXPIRED"){
+                // If the saved reconnect token is no longer accepted, retry with
+                // the room code. The server can reclaim this tab's disconnected seat.
+                try{sessionStorage.removeItem(ONLINE_SESSION_KEY);}catch{}
+                onlineReconnectToken="";
+                if(onlineRoomCode && socket.readyState===WebSocket.OPEN){
+                    onlineStatus("Reconnecting with room code...");
+                    socket.send(JSON.stringify({type:"join_room",roomCode:onlineRoomCode,resumeFallback:true}));
+                    return;
+                }
+            }
+            if(m.code==="ROOM_NOT_FOUND"){
                 try{sessionStorage.removeItem(ONLINE_SESSION_KEY);}catch{}
                 onlineReconnectToken="";
             }
+            onlineStatus(m.message||"Online error.");
             return;
         }
         if(m.type==="player_left") onlineStatus(`Player ${m.playerIndex+1} disconnected. Waiting for reconnection...`);
