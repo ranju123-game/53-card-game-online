@@ -2127,7 +2127,12 @@ function renderPlayers() {
         const order = Array.isArray(seatOrder) && seatOrder.length === PLAYER_COUNT
             ? seatOrder : [0, 4, 3, 2, 1];
         const localPos = Math.max(0, order.indexOf(localIndex));
-        const playerIndex = order[(localPos + seatOffset) % PLAYER_COUNT];
+        // The DOM seats are laid out as: bottom, bottom-left, top-left,
+        // top-right, bottom-right. Increasing DOM offsets therefore travel
+        // counterclockwise around the table. Reverse the visual offset here so
+        // seatOrder's clockwise order is displayed clockwise on screen, while
+        // keeping the local player anchored at the bottom seat.
+        const playerIndex = order[(localPos - seatOffset + PLAYER_COUNT) % PLAYER_COUNT];
         const player = players[playerIndex];
         const playerBox = $(`player${seatOffset + 1}`);
 
