@@ -13,6 +13,8 @@ let onlineSocket = null;
 let onlineHost = false;
 let suppressNetworkSync = false;
 let onlineForceFullState = false;
+// Avoid rebuilding every card and seat when the server repeats an unchanged snapshot.
+let lastOnlineRenderSignature = "";
 function getLocalPlayerIndex(){ return isOnlineGame ? myPlayerIndex : 0; }
 function clockwiseNextPlayer(playerIndex) {
     const order = Array.isArray(seatOrder) && seatOrder.length === PLAYER_COUNT
@@ -5392,6 +5394,19 @@ function broadcastOnlineState(){
 }
 function applyOnlineState(st){
     if(!st || !Array.isArray(st.players) || st.players.length!==PLAYER_COUNT) return;
+
+    // Repeated identical WebSocket snapshots used to rebuild every card and
+    // player panel, causing visible flicker/jitter around the table. Ignore
+    // unchanged board state; message text can update without rebuilding the UI.
+    const renderSnapshot = { ...st };
+    delete renderSnapshot.message;
+    const renderSignature = JSON.stringify(renderSnapshot);
+    if (renderSignature === lastOnlineRenderSignature) {
+        if (st.message) setMessage(st.message);
+        return;
+    }
+    lastOnlineRenderSignature = renderSignature;
+
     suppressNetworkSync=true;
     try{
         players=st.players;
@@ -5434,6 +5449,7 @@ function showOnlinePanel(){
     $("joinOnlineBtn").onclick=()=>connectOnline("join",$("roomCodeInput").value.trim().toUpperCase());
 }
 function connectOnline(mode,room){
+    lastOnlineRenderSignature = "";
     const nameInput = $("playerNameInput");
     const enteredName = nameInput ? nameInput.value.trim().replace(/\\s+/g, " ").slice(0, 24) : "";
 
