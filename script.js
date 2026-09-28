@@ -14,6 +14,18 @@ let onlineHost = false;
 let suppressNetworkSync = false;
 let onlineForceFullState = false;
 function getLocalPlayerIndex(){ return isOnlineGame ? myPlayerIndex : 0; }
+function clockwiseNextPlayer(playerIndex) {
+    const order = Array.isArray(seatOrder) && seatOrder.length === PLAYER_COUNT
+        ? seatOrder : [0, 4, 3, 2, 1];
+    const pos = order.indexOf(playerIndex);
+    return order[(pos < 0 ? 0 : pos + 1) % PLAYER_COUNT];
+}
+function clockwisePreviousPlayer(playerIndex) {
+    const order = Array.isArray(seatOrder) && seatOrder.length === PLAYER_COUNT
+        ? seatOrder : [0, 4, 3, 2, 1];
+    const pos = order.indexOf(playerIndex);
+    return order[(pos < 0 ? 0 : pos - 1 + PLAYER_COUNT) % PLAYER_COUNT];
+}
 function isMyTurn(){ return currentPlayer === getLocalPlayerIndex(); }
 
 
@@ -82,6 +94,11 @@ let licensed = [
 let gameOver = false;
 let gameWinner = -1;
 let gameStarted = false;
+let seatingPhase = false;
+let seatingPicks = [];
+let seatingComplete = false;
+let seatOrder = [0, 4, 3, 2, 1]; // clockwise order of actual player indices
+let initialStarter = 0;
 let lastRanking = [];
 
 // 10-game match scoreboard
@@ -620,8 +637,11 @@ function showRoundScoreboard(
             const row = document.createElement("tr");
 
             const playerCell = document.createElement("td");
-            playerCell.textContent =
-                i === 0 ? "You" : `Player ${i + 1}`;
+            playerCell.textContent = isOnlineGame
+                ? ((players[i] && !/^Player \\d+$/.test(players[i].name))
+                    ? players[i].name
+                    : "Waiting...")
+                : (i === 0 ? "You" : `Player ${i + 1}`);
             playerCell.style.padding = "10px 8px";
             playerCell.style.borderBottom = "1px solid #ddd";
             playerCell.style.fontWeight = "700";
@@ -653,7 +673,11 @@ function showRoundScoreboard(
 
         for (let i = 0; i < PLAYER_COUNT; i++) {
             const th = document.createElement("th");
-            th.textContent = i === 0 ? "You" : `Player ${i + 1}`;
+            th.textContent = isOnlineGame
+                ? ((players[i] && !/^Player \\d+$/.test(players[i].name))
+                    ? players[i].name
+                    : "Waiting...")
+                : (i === 0 ? "You" : `Player ${i + 1}`);
             th.style.padding = "9px 5px";
             th.style.borderBottom = "2px solid #222";
             th.style.whiteSpace = "nowrap";
@@ -732,7 +756,11 @@ function showRoundScoreboard(
         for (let i = 0; i < PLAYER_COUNT; i++) {
             if (totals[i] === minScore) {
                 winners.push(
-                    i === 0 ? "You" : `Player ${i + 1}`
+                    isOnlineGame
+                        ? ((players[i] && !/^Player \\d+$/.test(players[i].name))
+                            ? players[i].name
+                            : "Waiting...")
+                        : (i === 0 ? "You" : `Player ${i + 1}`)
                 );
             }
         }
@@ -913,10 +941,14 @@ function newGame(resetMatch = true) {
        This follows the clockwise direction around the table
        while giving every player exactly 2 starting games.
     */
-    const clockwiseOrder = [0, 4, 3, 2, 1];
-    const startingPlayer =
-        clockwiseOrder[roundScores.length % PLAYER_COUNT];
+    const matchSeatOrder = Array.isArray(seatOrder) && seatOrder.length === PLAYER_COUNT
+        ? seatOrder : [0, 4, 3, 2, 1];
+    // Game 1 starts with the player immediately clockwise after the highest-card player.
+    // Subsequent games rotate clockwise through the same fixed seating order.
+    const initialPos = Math.max(0, matchSeatOrder.indexOf(initialStarter));
+    const startingPlayer = matchSeatOrder[(initialPos + (roundScores.length % PLAYER_COUNT)) % PLAYER_COUNT];
 
+    seatingPhase = false;
     roundStartingPlayer = startingPlayer;
 
     lastRanking = [];
@@ -1096,6 +1128,7 @@ function render() {
     renderPlayers();
     renderHand();
     renderMelds();
+    renderSeatingPhase();
 
     updateButtons();
     updateCompleteButton();
@@ -1142,7 +1175,7 @@ function renderTableIndicator() {
 
     if (
         isMyTurn() &&
-        roundStartingPlayer === 0 &&
+        roundStartingPlayer === getLocalPlayerIndex() &&
         !indicatorTaken &&
         !firstTurnCompleted[getLocalPlayerIndex()] &&
         turnMode === null
@@ -1166,7 +1199,7 @@ function renderTableIndicator() {
 function takeIndicator() {
     if (gameOver) return;
     if (!isMyTurn()) return;
-    if (roundStartingPlayer !== 0) return;
+    if (roundStartingPlayer !== getLocalPlayerIndex()) return;
 
     if (
         firstTurnCompleted[getLocalPlayerIndex()]
@@ -2086,8 +2119,10 @@ function renderPlayers() {
     const localIndex = getLocalPlayerIndex();
 
     for (let seatOffset = 0; seatOffset < PLAYER_COUNT; seatOffset++) {
-        const playerIndex =
-            (localIndex + seatOffset) % PLAYER_COUNT;
+        const order = Array.isArray(seatOrder) && seatOrder.length === PLAYER_COUNT
+            ? seatOrder : [0, 4, 3, 2, 1];
+        const localPos = Math.max(0, order.indexOf(localIndex));
+        const playerIndex = order[(localPos + seatOffset) % PLAYER_COUNT];
         const player = players[playerIndex];
         const playerBox = $(`player${seatOffset + 1}`);
 
@@ -2104,10 +2139,17 @@ function renderPlayers() {
                 node => node.nodeType === Node.TEXT_NODE
             );
             if (labelNode) {
+                const displayName =
+                    isOnlineGame && /^Player \\d+$/.test(player.name)
+                        ? "Waiting..."
+                        : player.name;
+
+                // Online seats show names only (no Player 1/2/3/4/5 labels).
+                // The visual seats still follow the existing clockwise mapping.
                 labelNode.textContent =
-                    seatOffset === 0
-                        ? (isOnlineGame ? `${player.name} (You) ` : "You ")
-                        : `${player.name} `;
+                    isOnlineGame
+                        ? `${displayName} `
+                        : (seatOffset === 0 ? "You " : `${player.name} `);
             }
         }
 
@@ -3588,7 +3630,7 @@ function completeTurn() {
 
     resetTurnState();
 
-    currentPlayer = (getLocalPlayerIndex() - 1 + PLAYER_COUNT) % PLAYER_COUNT;
+    currentPlayer = clockwiseNextPlayer(getLocalPlayerIndex());
 
     updateMeldVisibility();
 
@@ -3597,7 +3639,9 @@ function completeTurn() {
     render();
 
     setMessage(
-        `${players[currentPlayer].name === "Player 1" ? "Your" : players[currentPlayer].name}'s turn.`
+        isOnlineGame && currentPlayer === getLocalPlayerIndex()
+            ? "Your turn."
+            : `${players[currentPlayer].name}'s turn.`
     );
 
     if (!isOnlineGame) {
@@ -4859,9 +4903,7 @@ function finishAITurn(
 
     resetTurnState();
 
-    currentPlayer =
-        (aiIndex - 1 + PLAYER_COUNT) %
-        PLAYER_COUNT;
+    currentPlayer = clockwiseNextPlayer(aiIndex);
 
     updateMeldVisibility();
 
@@ -5146,6 +5188,87 @@ function setMessage(
 
 
 /* =========================================================
+   ONLINE SEATING DRAW (one-time setup for the 10-game match)
+========================================================= */
+function startSeatingPhase() {
+    if (!isOnlineGame || !onlineHost) return;
+    seatingPhase = true;
+    seatingComplete = false;
+    seatingPicks = [];
+    seatOrder = [0, 4, 3, 2, 1];
+    initialStarter = 0;
+    gameStarted = false;
+    gameOver = false;
+    gameWinner = -1;
+    roundScores = [];
+    players = Array.from({ length: PLAYER_COUNT }, (_, i) => ({
+        name: `Player ${i + 1}`, hand: [], melds: []
+    }));
+    if (onlinePlayerName && players[myPlayerIndex]) players[myPlayerIndex].name = onlinePlayerName;
+    deck = [];
+    discardPile = [];
+    indicator = null;
+    indicatorAvailable = false;
+    indicatorTaken = false;
+    universalRank = null;
+    currentPlayer = 0;
+    resetTurnState();
+    setMessage('Choose one face-down card. All five choices determine the seating for the full 10-game match.');
+    render();
+    broadcastOnlineState();
+}
+
+function renderSeatingPhase() {
+    let panel = $('seatingSetupPanel');
+    if (!seatingPhase || !isOnlineGame) {
+        if (panel) panel.remove();
+        return;
+    }
+    if (!panel) {
+        panel = document.createElement('div');
+        panel.id = 'seatingSetupPanel';
+        panel.style.cssText = 'position:relative;z-index:50;margin:14px auto;padding:18px;max-width:900px;background:#fff;border:2px solid #cbd5e1;border-radius:16px;box-shadow:0 8px 28px #0002;text-align:center;';
+        const game = $('gameScreen');
+        if (game) game.prepend(panel);
+    }
+    const myPick = seatingPicks.find(p => p.playerIndex === getLocalPlayerIndex());
+    const allPicked = seatingPicks.length >= PLAYER_COUNT;
+    let html = `<h2 style="margin:0 0 8px">Choose a card to decide seating</h2><p style="margin:0 0 12px">${seatingPicks.length}/5 players have chosen. Seating stays fixed for all 10 games.</p>`;
+    if (allPicked && !seatingComplete) {
+        const dealerIndex = Number.isInteger(window.__seatingServerIndex) ? window.__seatingServerIndex : -1;
+        const dealerPick = seatingPicks.find(p => p.playerIndex === dealerIndex);
+        html += `<p>Highest card: <strong>${dealerPick ? cardText(dealerPick.card) : ''}</strong> — ${players[dealerIndex]?.name || 'Dealer'}.</p>`;
+        html += dealerIndex === getLocalPlayerIndex()
+            ? '<p>You have the highest card. Shuffle the five cards and deal them to decide the fixed seating order.</p><button id="dealSeatingBtn" type="button" style="padding:12px 20px;border:0;border-radius:10px;background:#2563eb;color:#fff;font-weight:800;cursor:pointer">SHUFFLE &amp; DEAL</button>'
+            : '<p>Waiting for the highest-card player to shuffle and deal…</p>';
+    } else if (allPicked && seatingComplete) {
+        const sequence = seatOrder.map(i => {
+            const pick = seatingPicks.find(p => p.playerIndex === i);
+            return pick ? `${cardText(pick.card)} — ${players[i]?.name || `Player ${i+1}`}` : (players[i]?.name || `Player ${i+1}`);
+        });
+        html += `<p><strong>Clockwise seating:</strong> ${sequence.join(' → ')}</p><p>The player immediately clockwise after the highest card starts Game 1. The starting player rotates for the next games.</p><p>Starting Game 1…</p>`;
+    } else if (myPick) {
+        html += `<p style="font-size:18px">Your card: <strong>${cardText(myPick.card)}</strong></p><p>Waiting for the other players to choose.</p>`;
+    } else {
+        html += '<p>Choose any face-down card below.</p><div style="display:grid;grid-template-columns:repeat(13,minmax(24px,1fr));gap:5px;max-width:650px;margin:0 auto">';
+        for (let i=0;i<52-seatingPicks.length;i++) html += `<button type="button" data-seat-pick="${i}" aria-label="Choose face-down card ${i+1}" style="height:54px;min-width:0;border:1px solid #64748b;border-radius:6px;background:repeating-linear-gradient(45deg,#1d4ed8,#1d4ed8 5px,#eff6ff 5px,#eff6ff 7px);cursor:pointer;color:transparent">▧</button>`;
+        html += '</div>';
+    }
+    panel.innerHTML = html;
+    panel.querySelectorAll('[data-seat-pick]').forEach(btn => btn.addEventListener('click', () => {
+        if (myPick || !onlineSocket || onlineSocket.readyState !== WebSocket.OPEN) return;
+        panel.querySelectorAll('button').forEach(b => b.disabled = true);
+        onlineSocket.send(JSON.stringify({ type: 'seating_pick', roomCode: onlineRoomCode, cardIndex: Number(btn.dataset.seatPick) }));
+    }));
+    const dealButton = $('dealSeatingBtn');
+    if (dealButton) dealButton.addEventListener('click', () => {
+        if (!onlineSocket || onlineSocket.readyState !== WebSocket.OPEN) return;
+        dealButton.disabled = true;
+        onlineSocket.send(JSON.stringify({ type: 'seating_deal', roomCode: onlineRoomCode }));
+    });
+}
+
+/* =========================================================
    ONLINE MULTIPLAYER
 ========================================================= */
 function broadcastOnlineState(){
@@ -5153,6 +5276,7 @@ function broadcastOnlineState(){
     const forceFull = onlineForceFullState && onlineHost;
     onlineSocket.send(JSON.stringify({type:"state",roomCode:onlineRoomCode,forceFull,state:{
         players,deck,discardPile,indicator,indicatorAvailable,indicatorTaken,roundStartingPlayer,universalRank,currentPlayer,
+        seatingPhase,seatingPicks,seatingComplete,seatOrder,initialStarter,
         selectedCards:[],hasDrawn,hasDiscarded,turnMode,turnActionMade,turnMeldMade,firstTurnCompleted,meldsRevealed,licensed,
         gameOver,gameWinner,gameStarted,lastRanking,roundScores,suffolCount,message:$('message')?$('message').textContent:""
     }}));
@@ -5181,6 +5305,7 @@ function applyOnlineState(st){
         firstTurnCompleted=Array.isArray(st.firstTurnCompleted)?st.firstTurnCompleted:[false,false,false,false,false];
         meldsRevealed=Array.isArray(st.meldsRevealed)?st.meldsRevealed:[false,false,false,false,false];
         licensed=Array.isArray(st.licensed)?st.licensed:[false,false,false,false,false]; gameOver=!!st.gameOver; gameWinner=Number.isInteger(st.gameWinner)?st.gameWinner:-1;
+        seatingPhase=!!st.seatingPhase; seatingPicks=Array.isArray(st.seatingPicks)?st.seatingPicks:[]; seatingComplete=!!st.seatingComplete; window.__seatingServerIndex = Number.isInteger(st.seatingServer) ? st.seatingServer : -1; seatOrder=Array.isArray(st.seatOrder)&&st.seatOrder.length===PLAYER_COUNT?st.seatOrder:[0,4,3,2,1]; initialStarter=Number.isInteger(st.initialStarter)?st.initialStarter:0;
         gameStarted=!!st.gameStarted; lastRanking=Array.isArray(st.lastRanking)?st.lastRanking:[]; roundScores=Array.isArray(st.roundScores)?st.roundScores:[]; suffolCount=Number.isInteger(st.suffolCount)?st.suffolCount:0; selectedCards=[];
         render(); if(st.message) setMessage(st.message);
         if(gameOver && lastRanking.length) showRoundScoreboard(lastRanking);
@@ -5226,9 +5351,9 @@ function connectOnline(mode,room){
     const proto=location.protocol==="https:"?"wss:":"ws:"; onlineSocket=new WebSocket(proto+"//"+location.host);
     onlineSocket.onopen=()=>onlineSocket.send(JSON.stringify({type:mode==="create"?"create_room":"join_room",roomCode:room||"",playerName:onlinePlayerName}));
     onlineSocket.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch{return}
-        if(m.type==="room_created"||m.type==="joined"){onlineRoomCode=m.roomCode;myPlayerIndex=m.playerIndex;onlineStatus(`Room ${onlineRoomCode} • You are Player ${myPlayerIndex+1}. Waiting for 5 players...`);return;}
+        if(m.type==="room_created"||m.type==="joined"){onlineRoomCode=m.roomCode;myPlayerIndex=m.playerIndex;onlineStatus(`Room ${onlineRoomCode} • Joined as ${onlinePlayerName}. Waiting for 5 players...`);return;}
         if(m.type==="room_status"){onlineStatus(`Room ${onlineRoomCode} • ${m.count}/5 players connected.`);return;}
-        if(m.type==="room_full"&&onlineHost){onlineStatus(`Room ${onlineRoomCode} is full. Starting game...`);newGame(true);return;}
+        if(m.type==="room_full"&&onlineHost){onlineStatus(`Room ${onlineRoomCode} is full. Choose one face-down card to determine seating.`);startSeatingPhase();return;}
         if(m.type==="state"){
             applyOnlineState(m.state);
             // Publish this browser's chosen name once the shared game state arrives.
@@ -5239,13 +5364,17 @@ function connectOnline(mode,room){
                 render();
                 broadcastOnlineState();
             }
+            if (onlineHost && seatingPhase && seatingComplete && !gameStarted) {
+                onlineStatus(`Seating decided for all 10 games. Starting Game 1...`);
+                newGame(true);
+            }
             const menu=$("mainMenu"),game=$("gameScreen");
             if(menu)menu.style.display="none";
             if(game)game.style.display="block";
             return;
         }
         if(m.type==="error") onlineStatus(m.message||"Online error.");
-        if(m.type==="player_left") onlineStatus(`Player ${m.playerIndex+1} disconnected. Waiting for reconnection...`);
+        if(m.type==="player_left") onlineStatus("A player disconnected. Waiting for reconnection...");
     };
     onlineSocket.onclose=()=>{if(isOnlineGame)onlineStatus("Connection closed.");}; onlineSocket.onerror=()=>onlineStatus("Could not connect to multiplayer server.");
 }
