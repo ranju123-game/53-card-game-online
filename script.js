@@ -1666,6 +1666,11 @@ function enableHandCardReordering(cardButton) {
             currentButton.style.transform = "scale(1.08) translateY(-10px)";
             currentButton.style.zIndex = "10000";
             currentButton.style.position = "relative";
+            // Keep the lifted original card from blocking hit-testing on a
+            // meld underneath it. The floating preview already has
+            // pointer-events:none, and the document-level pointer handlers
+            // continue tracking the drag.
+            currentButton.style.pointerEvents = "none";
 
             const preview = currentButton.cloneNode(true);
             preview.classList.add("hand-drag-preview");
@@ -1758,6 +1763,7 @@ function cleanupHandDrag() {
         cardButton.style.transform = "";
         cardButton.style.zIndex = "";
         cardButton.style.position = "";
+        cardButton.style.pointerEvents = "";
     }
 
     handDragState = null;
@@ -1785,6 +1791,7 @@ function moveHandCardToPointer(pointerX, pointerY) {
         dragged.style.transform = "scale(1.08) translateY(-10px)";
         dragged.style.zIndex = "10000";
         dragged.style.position = "relative";
+        dragged.style.pointerEvents = "none";
     }
 
     if (handDragState.preview) {
