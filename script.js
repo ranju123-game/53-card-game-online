@@ -1858,17 +1858,18 @@ function moveHandCardToPointer(pointerX, pointerY) {
 
 function getMeldDropTarget(pointerX, pointerY) {
     /*
-       Use the actual on-screen bounds of each meld row instead of relying
-       only on elementsFromPoint(). During a drag, overlapping cards,
-       transforms, and frequent hand reordering can make hit-testing return
-       a neighbouring element intermittently. A drop is accepted only when
-       the pointer is inside a visible meld row's rectangle.
+       Allow a card to be dropped directly on a meld OR just beyond either
+       horizontal end of the meld. This lets players add (for example) an 8
+       immediately to the right of a 7 without having to drop on top of a
+       card. Keep the vertical hit band tight so dragging/reordering cards in
+       the player's hand does not accidentally play them onto a meld.
     */
     const rows = [...document.querySelectorAll(
         '.meld-row[data-meld-player][data-meld-index]'
     )];
 
     let bestTarget = null;
+    let bestDistance = Infinity;
     let bestArea = Infinity;
 
     for (const row of rows) {
@@ -1877,17 +1878,34 @@ function getMeldDropTarget(pointerX, pointerY) {
         const rect = row.getBoundingClientRect();
         if (rect.width <= 0 || rect.height <= 0) continue;
 
-        const inside =
-            pointerX >= rect.left &&
-            pointerX <= rect.right &&
-            pointerY >= rect.top &&
-            pointerY <= rect.bottom;
+        const firstCard = row.querySelector('.card, button, [data-card-id]');
+        const cardRect = firstCard ? firstCard.getBoundingClientRect() : null;
+        const cardWidth = cardRect && cardRect.width > 0 ? cardRect.width : 42;
+        const cardHeight = cardRect && cardRect.height > 0 ? cardRect.height : 60;
 
-        if (!inside) continue;
+        // One card-width of tolerance allows dropping just outside either end.
+        const horizontalTolerance = Math.max(24, cardWidth * 0.95);
+        const verticalTolerance = Math.max(8, cardHeight * 0.22);
 
-        // If rows overlap visually, prefer the smallest actual drop target.
+        const dx = pointerX < rect.left
+            ? rect.left - pointerX
+            : pointerX > rect.right
+                ? pointerX - rect.right
+                : 0;
+        const dy = pointerY < rect.top
+            ? rect.top - pointerY
+            : pointerY > rect.bottom
+                ? pointerY - rect.bottom
+                : 0;
+
+        if (dx > horizontalTolerance || dy > verticalTolerance) continue;
+
+        // Choose the nearest row; if equally close, prefer the smaller row.
+        const distance = Math.hypot(dx, dy);
         const area = rect.width * rect.height;
-        if (area < bestArea) {
+        if (distance < bestDistance ||
+            (distance === bestDistance && area < bestArea)) {
+            bestDistance = distance;
             bestArea = area;
             bestTarget = row;
         }
