@@ -1876,44 +1876,11 @@ function getMeldDropTarget(pointerX, pointerY) {
         }
     }
 
-    /*
-       If the pointer is on the edge/space immediately beside a meld,
-       use the closest visible meld row.  This makes dropping on a meld
-       reliable without changing which meld is selected when the pointer
-       is clearly over another meld.
-    */
-    const meldRows = [...document.querySelectorAll(".meld-row")];
-    let closest = null;
-    let closestDistance = Infinity;
-
-    for (const row of meldRows) {
-        if (row.dataset.meldPlayer === undefined ||
-            row.dataset.meldIndex === undefined) {
-            continue;
-        }
-
-        const rect = row.getBoundingClientRect();
-        const dx =
-            pointerX < rect.left
-                ? rect.left - pointerX
-                : pointerX > rect.right
-                    ? pointerX - rect.right
-                    : 0;
-        const dy =
-            pointerY < rect.top
-                ? rect.top - pointerY
-                : pointerY > rect.bottom
-                    ? pointerY - rect.bottom
-                    : 0;
-        const distance = Math.hypot(dx, dy);
-
-        if (distance < closestDistance) {
-            closestDistance = distance;
-            closest = row;
-        }
-    }
-
-    return closestDistance <= 70 ? closest : null;
+    // Only treat this as a meld drop when the pointer is actually over
+    // that meld. Do not use a nearby-meld fallback: when a player reorders
+    // a card horizontally in their hand, the hand may be close to a meld
+    // and the fallback can accidentally play the card onto it.
+    return null;
 }
 
 function updateMeldDropTarget(pointerX, pointerY) {
