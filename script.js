@@ -1858,36 +1858,42 @@ function moveHandCardToPointer(pointerX, pointerY) {
 
 function getMeldDropTarget(pointerX, pointerY) {
     /*
-       Find the ACTUAL meld under the pointer.  The dragged card has a
-       floating preview with pointer-events disabled, so the table/meld
-       remains clickable underneath it.
+       Use the actual on-screen bounds of each meld row instead of relying
+       only on elementsFromPoint(). During a drag, overlapping cards,
+       transforms, and frequent hand reordering can make hit-testing return
+       a neighbouring element intermittently. A drop is accepted only when
+       the pointer is inside a visible meld row's rectangle.
     */
-    const elements = document.elementsFromPoint
-        ? document.elementsFromPoint(pointerX, pointerY)
-        : [];
+    const rows = [...document.querySelectorAll(
+        '.meld-row[data-meld-player][data-meld-index]'
+    )];
 
-    for (const element of elements) {
-        let node = element;
+    let bestTarget = null;
+    let bestArea = Infinity;
 
-        while (node && node !== document.body) {
-            if (
-                node.classList &&
-                node.classList.contains("meld-row") &&
-                node.dataset.meldPlayer !== undefined &&
-                node.dataset.meldIndex !== undefined
-            ) {
-                return node;
-            }
+    for (const row of rows) {
+        if (!row.isConnected || row.getClientRects().length === 0) continue;
 
-            node = node.parentElement;
+        const rect = row.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) continue;
+
+        const inside =
+            pointerX >= rect.left &&
+            pointerX <= rect.right &&
+            pointerY >= rect.top &&
+            pointerY <= rect.bottom;
+
+        if (!inside) continue;
+
+        // If rows overlap visually, prefer the smallest actual drop target.
+        const area = rect.width * rect.height;
+        if (area < bestArea) {
+            bestArea = area;
+            bestTarget = row;
         }
     }
 
-    // Only treat this as a meld drop when the pointer is actually over
-    // that meld. Do not use a nearby-meld fallback: when a player reorders
-    // a card horizontally in their hand, the hand may be close to a meld
-    // and the fallback can accidentally play the card onto it.
-    return null;
+    return bestTarget;
 }
 
 function updateMeldDropTarget(pointerX, pointerY) {
