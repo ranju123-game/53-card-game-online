@@ -1044,3 +1044,369 @@ button:active {
         font-size: 11px;
     }
 }
+/* =====================================================
+   PREMIUM CASINO REDESIGN — visual-only layer
+   Game logic and existing element IDs are intentionally unchanged.
+===================================================== */
+:root {
+    color-scheme: dark;
+    --page-ink: #eaf1ff;
+    --muted-ink: #a8b6cc;
+    --gold: #e7c778;
+    --gold-bright: #ffe4a0;
+    --panel: rgba(12, 24, 39, .92);
+    --panel-line: rgba(231, 199, 120, .28);
+}
+
+html, body {
+    background: #07111f;
+    color: var(--page-ink);
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+body {
+    background:
+        radial-gradient(ellipse at 50% -15%, rgba(34, 86, 111, .45), transparent 52%),
+        radial-gradient(ellipse at 50% 105%, rgba(14, 94, 73, .22), transparent 55%),
+        #07111f;
+}
+
+.app {
+    padding: clamp(10px, 2vw, 24px);
+}
+
+.topbar {
+    max-width: 1240px;
+    margin-bottom: 18px;
+    padding: 14px 18px;
+    border: 1px solid rgba(231, 199, 120, .18);
+    border-radius: 18px;
+    background: linear-gradient(120deg, rgba(18, 32, 50, .96), rgba(10, 22, 36, .94));
+    box-shadow: 0 14px 34px rgba(0, 0, 0, .2);
+}
+
+.topbar h1 {
+    color: #fff7e3;
+    font-size: clamp(20px, 2.4vw, 29px);
+    font-weight: 850;
+    letter-spacing: -.035em;
+}
+
+.topbar p {
+    color: var(--muted-ink);
+    font-size: 12px;
+    letter-spacing: .04em;
+}
+
+.topbar button,
+.actions button,
+.controls button {
+    border: 1px solid rgba(231, 199, 120, .34);
+    border-radius: 10px;
+    background: linear-gradient(180deg, #fff0c8, #dfbd70);
+    color: #172235;
+    font-weight: 800;
+    box-shadow: 0 5px 14px rgba(0, 0, 0, .2);
+    transition: filter .15s ease, transform .15s ease, box-shadow .15s ease;
+}
+
+.topbar button { padding: 11px 18px; }
+.topbar button:hover:not(:disabled),
+.actions button:hover:not(:disabled),
+.controls button:hover:not(:disabled) {
+    filter: brightness(1.06);
+    box-shadow: 0 7px 18px rgba(0, 0, 0, .26);
+}
+
+.info-panel {
+    max-width: 980px;
+    gap: 10px;
+    margin-bottom: 18px;
+}
+
+.info-panel > div {
+    min-width: 132px;
+    padding: 11px 17px;
+    border: 1px solid rgba(140, 171, 197, .16);
+    border-radius: 13px;
+    background: linear-gradient(145deg, rgba(20, 38, 57, .96), rgba(10, 24, 39, .96));
+    box-shadow: 0 8px 22px rgba(0, 0, 0, .15);
+}
+
+.info-panel span {
+    color: #aebed0;
+    font-size: 10px;
+    font-weight: 750;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+}
+
+.info-panel strong {
+    color: var(--gold-bright);
+    font-size: 20px;
+    line-height: 1.1;
+}
+
+.table {
+    width: min(96vw, 1180px);
+    height: min(78vh, 760px);
+    min-height: 560px;
+    border: 9px solid #b58a43;
+    border-radius: 48% / 43%;
+    background:
+        radial-gradient(ellipse at 50% 42%, rgba(28, 119, 87, .98) 0%, rgba(10, 86, 62, .98) 52%, rgba(5, 49, 43, .99) 100%);
+    box-shadow:
+        0 0 0 4px rgba(231, 199, 120, .12),
+        0 24px 70px rgba(0, 0, 0, .45),
+        inset 0 0 0 2px rgba(255, 237, 183, .16),
+        inset 0 0 60px rgba(0, 0, 0, .22);
+}
+
+.player {
+    border: 1px solid rgba(229, 211, 160, .24);
+    border-radius: 15px;
+    background: linear-gradient(145deg, rgba(8, 29, 32, .88), rgba(8, 24, 31, .78));
+    box-shadow: 0 8px 22px rgba(0, 0, 0, .18), inset 0 1px 0 rgba(255,255,255,.04);
+    backdrop-filter: blur(4px);
+    padding: 9px;
+}
+
+.player h2 {
+    color: #fff2ce;
+    font-size: 15px;
+    font-weight: 850;
+    letter-spacing: .015em;
+}
+
+.status { color: #ffe18b; }
+
+#player1 {
+    border-color: rgba(255, 222, 133, .56);
+    background: linear-gradient(145deg, rgba(9, 45, 39, .96), rgba(8, 31, 32, .93));
+    box-shadow: 0 10px 28px rgba(0, 0, 0, .28), inset 0 0 0 1px rgba(255, 222, 133, .08);
+}
+
+.card {
+    border: 1px solid #d6dbe4;
+    border-radius: 8px;
+    background: linear-gradient(145deg, #fff, #f1f4f8);
+    color: #111827;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, .25);
+    font-weight: 850;
+}
+
+.card.red { color: #c92c43; }
+.card.black { color: #101827; }
+.card.joker { color: #7544c6; }
+
+.card.selected {
+    outline: 2px solid var(--gold-bright);
+    box-shadow: 0 0 0 4px rgba(255, 224, 145, .24), 0 9px 18px rgba(0, 0, 0, .35);
+}
+
+.back-card,
+.back-cards .back-card {
+    border: 1px solid #f5d992;
+    border-radius: 6px;
+    background:
+        repeating-linear-gradient(45deg, #102e59 0, #102e59 5px, #1a4a79 5px, #1a4a79 10px);
+    box-shadow: 0 3px 7px rgba(0, 0, 0, .3), inset 0 0 0 2px rgba(255,255,255,.06);
+}
+
+.deck-card {
+    border: 2px solid #f2d48b;
+    border-radius: 10px;
+    background:
+        linear-gradient(135deg, rgba(255,255,255,.12), transparent 35%),
+        repeating-linear-gradient(45deg, #12325d, #12325d 5px, #1d5280 5px, #1d5280 10px);
+    box-shadow: 0 8px 18px rgba(0, 0, 0, .34), inset 0 0 0 3px rgba(255,255,255,.05);
+}
+
+.pile-title {
+    color: #f9e7b7;
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: .12em;
+    text-shadow: 0 2px 4px rgba(0,0,0,.4);
+}
+
+.center-table .message {
+    border: 1px solid rgba(231, 199, 120, .4);
+    border-radius: 12px;
+    background: rgba(5, 17, 25, .91);
+    color: #fff2d1;
+    box-shadow: 0 8px 22px rgba(0, 0, 0, .2);
+    padding: 8px 12px;
+}
+
+.discard-cards .card.small {
+    border-color: #dce2eb;
+    box-shadow: 0 4px 9px rgba(0, 0, 0, .35);
+}
+
+.actions { gap: 7px; }
+.actions button { padding: 8px 11px; font-size: 12px; }
+.actions .danger { background: linear-gradient(180deg, #ffe4de, #e99b8c); border-color: rgba(255, 220, 211, .5); }
+.actions button:disabled,
+.controls button:disabled,
+.topbar button:disabled { opacity: .42; filter: grayscale(.25); box-shadow: none; }
+
+#completeBtn {
+    border: 2px solid #ffe8b1;
+    border-radius: 11px;
+    background: linear-gradient(180deg, #f8d985, #c99b43);
+    color: #172235;
+    box-shadow: 0 7px 18px rgba(0, 0, 0, .35);
+    letter-spacing: .04em;
+}
+
+/* Opening screen: a new dark, gold-accented game lobby. */
+#mainMenu {
+    background:
+        radial-gradient(ellipse at 50% 20%, rgba(35, 111, 91, .45), transparent 42%),
+        radial-gradient(circle at 15% 90%, rgba(179, 130, 55, .15), transparent 32%),
+        #07111f !important;
+}
+
+.menu-card {
+    width: min(92vw, 460px) !important;
+    padding: 44px 32px 34px !important;
+    border: 1px solid rgba(231, 199, 120, .42);
+    border-radius: 26px !important;
+    background: linear-gradient(145deg, rgba(19, 37, 55, .98), rgba(8, 20, 34, .98)) !important;
+    box-shadow: 0 28px 90px rgba(0,0,0,.52), inset 0 1px 0 rgba(255,255,255,.07) !important;
+}
+
+.menu-card h1 {
+    color: #fff0c8 !important;
+    font-size: clamp(32px, 8vw, 44px) !important;
+    letter-spacing: -.045em;
+}
+
+.menu-card p { color: #b6c4d5 !important; }
+.menu-button { min-height: 56px; border-radius: 13px !important; letter-spacing: .06em; }
+.menu-new-game {
+    background: linear-gradient(180deg, #f5d991, #c99a43) !important;
+    color: #162236 !important;
+    box-shadow: 0 8px 20px rgba(0,0,0,.22);
+}
+.menu-resume {
+    border: 1px solid rgba(231,199,120,.28) !important;
+    background: rgba(255,255,255,.07) !important;
+    color: #f2e4c2 !important;
+}
+#resumeStatus { color: #aab9ca !important; }
+
+/* Seating selection is part of the redesigned game, not a white page. */
+#seatingSetupPanel {
+    width: min(96%, 1050px) !important;
+    padding: clamp(16px, 2.4vw, 28px) !important;
+    border: 1px solid rgba(231, 199, 120, .42) !important;
+    border-radius: 22px !important;
+    background: linear-gradient(145deg, #12283b, #0a1928) !important;
+    color: #edf4ff !important;
+    box-shadow: 0 22px 60px rgba(0,0,0,.38), inset 0 1px 0 rgba(255,255,255,.05) !important;
+}
+
+#seatingSetupPanel h2 { color: #ffe5a5 !important; font-size: clamp(20px, 3vw, 28px) !important; }
+#seatingSetupPanel p { color: #bdcada !important; line-height: 1.5; }
+#seatingSetupPanel strong { color: #ffe5a5; }
+#seatingSetupPanel [style*="grid-template-columns"] {
+    width: min(100%, 900px) !important;
+    max-width: 900px !important;
+    grid-template-columns: repeat(13, minmax(0, 1fr)) !important;
+    gap: clamp(4px, .8vw, 9px) !important;
+    padding: 12px !important;
+    border: 1px solid rgba(231,199,120,.2);
+    border-radius: 16px;
+    background: rgba(3, 12, 22, .48);
+}
+#seatingSetupPanel [data-seat-pick] {
+    height: clamp(36px, 4.3vw, 58px) !important;
+    border: 1px solid rgba(245, 214, 146, .65) !important;
+    border-radius: 7px !important;
+    background:
+        repeating-linear-gradient(45deg, #102e59 0, #102e59 5px, #1d5280 5px, #1d5280 10px) !important;
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,.05), 0 3px 7px rgba(0,0,0,.2);
+    transition: transform .12s ease, filter .12s ease;
+}
+#seatingSetupPanel [data-seat-pick]:hover:not(:disabled) { transform: translateY(-2px); filter: brightness(1.18); }
+#seatingSetupPanel #dealSeatingBtn {
+    padding: 13px 24px !important;
+    border: 1px solid #ffe7a9 !important;
+    border-radius: 12px !important;
+    background: linear-gradient(180deg, #f5d991, #c99a43) !important;
+    color: #152237 !important;
+    font-weight: 900 !important;
+    letter-spacing: .04em;
+}
+
+/* Ready-to-start overlay gets a matching premium panel. */
+#startReadyPanel [role="dialog"] {
+    border: 1px solid rgba(231,199,120,.55) !important;
+    border-radius: 22px !important;
+    background: linear-gradient(145deg, #142b40, #091827) !important;
+    color: #edf4ff !important;
+    box-shadow: 0 28px 90px rgba(0,0,0,.55) !important;
+}
+#startReadyPanel #startReadyTitle { color: #ffe5a5; }
+#startReadyPanel [role="dialog"] > p { color: #bdcada !important; }
+#startReadyPanel [role="dialog"] > div[style*="background:#f1f5f9"] {
+    background: rgba(255,255,255,.06) !important;
+    border: 1px solid rgba(231,199,120,.18);
+}
+#startReadyPanel #confirmStartBtn {
+    border: 1px solid #ffe7a9 !important;
+    border-radius: 12px !important;
+    background: linear-gradient(180deg, #f5d991, #c99a43) !important;
+    color: #152237 !important;
+}
+#startReadyPanel #confirmStartBtn:disabled { background: #596879 !important; color: #e0e7ef !important; border-color: #7c8b9a !important; }
+
+/* Dynamically created online lobby, scoreboards and dialogs. */
+#gameScreen input,
+#gameScreen select,
+#gameScreen textarea {
+    border: 1px solid rgba(231,199,120,.32);
+    border-radius: 9px;
+    background: #0c1b2b;
+    color: #edf4ff;
+    padding: 10px 12px;
+}
+#gameScreen button:not(.deck-card):not(.card):not([data-seat-pick]) {
+    font-family: inherit;
+}
+
+@media (max-width: 700px) {
+    .app { padding: 7px; }
+    .topbar { padding: 10px 12px; border-radius: 13px; }
+    .topbar h1 { font-size: 18px; }
+    .topbar p { font-size: 10px; }
+    .info-panel { gap: 5px; }
+    .info-panel > div { min-width: 76px; padding: 7px 8px; border-radius: 9px; }
+    .info-panel span { font-size: 8px; letter-spacing: .06em; }
+    .info-panel strong { font-size: 15px; }
+    .table { width: 98vw; height: 76vh; min-height: 460px; border-width: 6px; }
+    .player { padding: 5px; border-radius: 10px; }
+    .player h2 { font-size: 11px; }
+    .card { width: 36px; height: 52px; font-size: 14px; }
+    .back-card { width: 25px; height: 36px; }
+    .meld-row .card.small { width: 27px; height: 38px; font-size: 10px; }
+    .actions { gap: 4px; }
+    .actions button { padding: 6px 7px; font-size: 10px; }
+    #seatingSetupPanel [style*="grid-template-columns"] { padding: 7px !important; gap: 4px !important; }
+}
+
+@media (max-width: 450px) {
+    .table { height: 72vh; min-height: 400px; }
+    #player1 { width: 220px; }
+    #player2, #player3, #player4, #player5 { width: 105px; }
+    .player h2 { font-size: 10px; }
+    .center-table { gap: 6px; }
+    .discard-column { min-width: 95px; }
+    .discard-cards { width: 95px; }
+    .discard-cards .card.small { width: 25px; height: 36px; font-size: 9px; }
+    #seatingSetupPanel { padding: 12px !important; }
+    #seatingSetupPanel [style*="grid-template-columns"] { gap: 3px !important; padding: 5px !important; }
+    #seatingSetupPanel [data-seat-pick] { height: 34px !important; }
+}
