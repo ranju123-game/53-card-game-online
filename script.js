@@ -3194,11 +3194,8 @@ function makeMeld() {
         return;
     }
 
-    if (
-        turnMode === null
-    ) {
-        turnMode = "meld";
-    }
+    // Do not lock the turn into meld mode until a valid meld action succeeds.
+    // This lets the player recover from accidentally pressing MAKE MELD.
 
     const cards =
         selectedCards.map(
