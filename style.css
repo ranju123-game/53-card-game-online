@@ -1297,33 +1297,15 @@ body {
 }
 #resumeStatus { color: #aab9ca !important; }
 
-/* Seating selection is its own full-screen page before the game table. */
+/* Seating selection is part of the redesigned game, not a white page. */
 #seatingSetupPanel {
-    position: fixed !important;
-    inset: 0 !important;
-    z-index: 100001 !important;
-    display: flex !important;
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-start;
-    width: 100vw !important;
-    max-width: none !important;
-    min-width: 0 !important;
-    height: 100vh !important;
-    max-height: 100vh !important;
-    min-height: 100vh !important;
-    margin: 0 !important;
-    padding: clamp(18px, 4vh, 42px) clamp(12px, 3vw, 32px) 28px !important;
-    box-sizing: border-box !important;
-    overflow-y: auto !important;
-    border: 0 !important;
-    border-radius: 0 !important;
-    background:
-        radial-gradient(ellipse at 50% 15%, rgba(35, 111, 91, .38), transparent 44%),
-        radial-gradient(circle at 15% 90%, rgba(179, 130, 55, .13), transparent 32%),
-        #07111f !important;
+    width: min(96%, 1050px) !important;
+    padding: clamp(16px, 2.4vw, 28px) !important;
+    border: 1px solid rgba(231, 199, 120, .42) !important;
+    border-radius: 22px !important;
+    background: linear-gradient(145deg, #12283b, #0a1928) !important;
     color: #edf4ff !important;
-    box-shadow: none !important;
+    box-shadow: 0 22px 60px rgba(0,0,0,.38), inset 0 1px 0 rgba(255,255,255,.05) !important;
 }
 
 #seatingSetupPanel h2 { color: #ffe5a5 !important; font-size: clamp(20px, 3vw, 28px) !important; }
@@ -1332,7 +1314,6 @@ body {
 #seatingSetupPanel [style*="grid-template-columns"] {
     width: min(100%, 900px) !important;
     max-width: 900px !important;
-    flex: 0 0 auto;
     grid-template-columns: repeat(13, minmax(0, 1fr)) !important;
     gap: clamp(4px, .8vw, 9px) !important;
     padding: 12px !important;
