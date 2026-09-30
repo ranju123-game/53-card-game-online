@@ -18,7 +18,12 @@
       min-height: 100vh;
       padding: 20px;
       box-sizing: border-box;
-      background: radial-gradient(circle at top, #2f3f5f 0%, #182238 45%, #0b1020 100%);
+      background: radial-gradient(
+        circle at top,
+        #2f3f5f 0%,
+        #182238 45%,
+        #0b1020 100%
+      );
     }
 
     .menu-card {
@@ -27,13 +32,13 @@
       padding: 42px 28px 34px;
       text-align: center;
       border-radius: 24px;
-      background: rgba(255,255,255,.97);
-      box-shadow: 0 25px 70px rgba(0,0,0,.45);
+      background: rgba(255, 255, 255, 0.97);
+      box-shadow: 0 25px 70px rgba(0, 0, 0, 0.45);
     }
 
     .menu-card h1 {
       margin: 0;
-      font-size: clamp(30px,8vw,46px);
+      font-size: clamp(30px, 8vw, 46px);
       line-height: 1.1;
       color: #111827;
     }
@@ -53,7 +58,7 @@
       font-size: 18px;
       font-weight: 800;
       cursor: pointer;
-      transition: transform .15s ease, opacity .15s ease;
+      transition: transform 0.15s ease, opacity 0.15s ease;
     }
 
     .menu-button:hover:not(:disabled) {
@@ -75,7 +80,7 @@
     }
 
     .menu-button:disabled {
-      opacity: .45;
+      opacity: 0.45;
       cursor: not-allowed;
     }
 
@@ -124,7 +129,7 @@
     </div>
   </div>
 
-  <!-- ACTUAL GAME -->
+  <!-- GAME SCREEN -->
   <div class="app" id="gameScreen">
 
     <!-- TOP BAR -->
@@ -163,7 +168,6 @@
     </section>
 
     <main>
-      <!-- GAME TABLE -->
       <section class="table">
 
         <!-- PLAYER 2 -->
@@ -226,7 +230,7 @@
               class="card empty discard-take-button"
               title="Take top discard"
               type="button"
-              style="display:none"
+              style="display: none;"
             >
               -
             </button>
@@ -261,7 +265,7 @@
           <div class="back-cards" id="p5Cards"></div>
         </div>
 
-        <!-- YOUR HAND -->
+        <!-- YOUR PLAYING AREA -->
         <section class="your-area player" id="player1">
 
           <div class="player-heading">
