@@ -5313,7 +5313,7 @@ function renderSeatingPhase() {
     if (!panel) {
         panel = document.createElement('div');
         panel.id = 'seatingSetupPanel';
-        panel.style.cssText = 'position:relative;z-index:50;margin:14px auto;padding:18px;max-width:900px;background:#fff;border:2px solid #cbd5e1;border-radius:16px;box-shadow:0 8px 28px #0002;text-align:center;';
+        panel.style.cssText = 'position:fixed;inset:0;z-index:100000;width:100%;height:100%;margin:0;padding:20px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;overflow:auto;background:radial-gradient(circle at top,#172b45 0%,#081426 72%);border:0;border-radius:0;box-shadow:none;text-align:center;color:#e2e8f0;';
         const game = $('gameScreen');
         if (game) game.prepend(panel);
     }
@@ -5347,7 +5347,15 @@ function renderSeatingPhase() {
         for (let i=0;i<52-seatingPicks.length;i++) html += `<button type="button" data-seat-pick="${i}" aria-label="Choose face-down card ${i+1}" style="height:54px;min-width:0;border:1px solid #64748b;border-radius:6px;background:repeating-linear-gradient(45deg,#1d4ed8,#1d4ed8 5px,#eff6ff 5px,#eff6ff 7px);cursor:pointer;color:transparent">▧</button>`;
         html += '</div>';
     }
-    panel.innerHTML = html;
+    // Render seating as its own full-screen page. The game table stays behind
+    // this opaque screen and cannot appear together with the seating picker.
+    panel.innerHTML = `<div style="width:min(100%,900px);max-height:100%;overflow:auto;box-sizing:border-box;padding:clamp(18px,4vw,34px);border:1px solid #475569;border-radius:22px;background:linear-gradient(145deg,#10243a,#071321);box-shadow:0 22px 70px #0008;text-align:center;color:#e2e8f0">
+      <style>
+        #seatingSetupPanel h2 { color:#fef3c7; }
+        #seatingSetupPanel p { color:#cbd5e1; }
+      </style>
+      ${html}
+    </div>`;
     panel.querySelectorAll('[data-seat-pick]').forEach(btn => btn.addEventListener('click', () => {
         if (myPick || !onlineSocket || onlineSocket.readyState !== WebSocket.OPEN) return;
         panel.querySelectorAll('button').forEach(b => b.disabled = true);
