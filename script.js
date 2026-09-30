@@ -1931,7 +1931,7 @@ function updateMeldDropTarget(pointerX, pointerY) {
     }
 }
 
-function extendSpecificMeldWithCard(meld, card) {
+function extendSpecificMeldWithCard(meld, card, preferredSide = null) {
     if (!meld) return null;
 
     if (meld.meldType === "set") {
@@ -1944,7 +1944,7 @@ function extendSpecificMeldWithCard(meld, card) {
     }
 
     if (meld.meldType === "sequence") {
-        const result = canExtendSequenceWithCards(meld, [card]);
+        const result = canExtendSequenceWithCards(meld, [card], preferredSide);
         if (!result) return null;
 
         const info = getStoredSequenceInfo(meld);
@@ -2020,7 +2020,14 @@ function tryDropDraggedCardOnMeld(pointerX, pointerY) {
     }
 
     /* The card being physically dragged is the card being played. */
-    const result = extendSpecificMeldWithCard(targetMeld, card);
+    // For sequences, use the side where the player released the card.
+    // This is especially important for Jokers, which can be valid at
+    // either end; otherwise the validator may always choose the right end.
+    const targetRect = target.getBoundingClientRect();
+    const preferredSide = targetMeld.meldType === "sequence"
+        ? (pointerX < targetRect.left + targetRect.width / 2 ? "prefix" : "suffix")
+        : null;
+    const result = extendSpecificMeldWithCard(targetMeld, card, preferredSide);
 
     if (!result) {
         setMessage("That card cannot be added to this meld.");
@@ -2800,7 +2807,8 @@ function cardMatchesSequencePosition(
 
 function findFixedSequenceExtension(
     meld,
-    cards
+    cards,
+    preferredSide = null
 ) {
     if (!meld || meld.length < 3 || !cards || cards.length === 0) {
         return null;
@@ -2823,7 +2831,16 @@ function findFixedSequenceExtension(
     const permutations = getCardPermutations(cards);
 
     for (const orderedCards of permutations) {
-        for (let prefixCount = 0; prefixCount <= orderedCards.length; prefixCount++) {
+        // If the player explicitly dropped on the left or right, validate
+        // that side only. Do not silently place a valid card at the opposite
+        // end just because that is the first valid permutation.
+        const prefixCounts = preferredSide === "prefix"
+            ? [orderedCards.length]
+            : preferredSide === "suffix"
+                ? [0]
+                : Array.from({ length: orderedCards.length + 1 }, (_, i) => i);
+
+        for (const prefixCount of prefixCounts) {
             const prefixCards = orderedCards.slice(0, prefixCount);
             const suffixCards = orderedCards.slice(prefixCount);
 
@@ -2903,11 +2920,13 @@ function canExtendSequence(
 
 function canExtendSequenceWithCards(
     meld,
-    cards
+    cards,
+    preferredSide = null
 ) {
     return findFixedSequenceExtension(
         meld,
-        cards
+        cards,
+        preferredSide
     );
 }
 
