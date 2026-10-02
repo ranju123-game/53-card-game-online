@@ -13,6 +13,9 @@ let onlineSocket = null;
 let onlineHost = false;
 let suppressNetworkSync = false;
 let onlineForceFullState = false;
+// Keep this player's preferred hand order when online state snapshots arrive.
+// Card order is a local display preference, not a game-rule change.
+let localHandOrderIds = [];
 // Avoid rebuilding every card and seat when the server repeats an unchanged snapshot.
 let lastOnlineRenderSignature = "";
 function getLocalPlayerIndex(){ return isOnlineGame ? myPlayerIndex : 0; }
@@ -2079,6 +2082,7 @@ function finishHandCardReorder() {
     if (newHand.length !== oldHand.length) return;
 
     players[getLocalPlayerIndex()].hand = newHand;
+    localHandOrderIds = newHand.map(card => card.id);
 
     selectedCards = selectedIds
         .map(id => players[getLocalPlayerIndex()].hand.findIndex(card => card.id === id))
@@ -5186,6 +5190,7 @@ function sortHand() {
     );
 
     selectedCards = [];
+    localHandOrderIds = players[getLocalPlayerIndex()].hand.map(card => card.id);
 
     render();
 }
@@ -5470,6 +5475,26 @@ function applyOnlineState(st){
     try{
         players=st.players;
 
+        // Server snapshots can contain the original hand order. Re-apply this
+        // browser's manually arranged order by stable card ID, while keeping
+        // newly drawn cards and removing cards that are no longer in the hand.
+        if (isOnlineGame && players[getLocalPlayerIndex()] &&
+            Array.isArray(players[getLocalPlayerIndex()].hand)) {
+            const localHand = players[getLocalPlayerIndex()].hand;
+            if (localHandOrderIds.length) {
+                const byId = new Map(localHand.map(card => [card.id, card]));
+                const orderedHand = localHandOrderIds
+                    .map(id => byId.get(id))
+                    .filter(Boolean);
+                const includedIds = new Set(orderedHand.map(card => card.id));
+                localHand.forEach(card => {
+                    if (!includedIds.has(card.id)) orderedHand.push(card);
+                });
+                players[getLocalPlayerIndex()].hand = orderedHand;
+            }
+            localHandOrderIds = players[getLocalPlayerIndex()].hand.map(card => card.id);
+        }
+
         // JSON does not preserve custom properties attached to meld arrays.
         // Rebuild each meld's sequence/set metadata after receiving online state,
         // otherwise valid prefix extensions (for example 3♦ before 4♦) are rejected.
@@ -5509,6 +5534,7 @@ function showOnlinePanel(){
 }
 function connectOnline(mode,room){
     lastOnlineRenderSignature = "";
+    localHandOrderIds = [];
     const nameInput = $("playerNameInput");
     const enteredName = nameInput ? nameInput.value.trim().replace(/\\s+/g, " ").slice(0, 24) : "";
 
